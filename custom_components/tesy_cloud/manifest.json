@@ -1,0 +1,15 @@
+{
+  "domain": "tesy_cloud",
+  "name": "MyTESY Cloud Convector",
+  "version": "0.3.1",
+  "documentation": "https://v4.mytesy.com",
+  "issue_tracker": "https://github.com/benov84/homebridge-tesy-heater/issues",
+  "requirements": [],
+  "codeowners": [],
+  "config_flow": true,
+  "iot_class": "cloud_polling",
+  "integration_type": "device",
+  "loggers": [
+    "tesy_cloud"
+  ]
+}
