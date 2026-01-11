@@ -1,7 +1,7 @@
 {
   "domain": "tesy_cloud",
   "name": "MyTESY Cloud Convector",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "documentation": "https://github.com/Kosztyk/MyTesyCloud/blob/main/README.md",
   "issue_tracker": "https://github.com/Kosztyk/MyTesyCloud/issues",
   "requirements": [],
