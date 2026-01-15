@@ -1,8 +1,4 @@
-"""Sensor entities for MyTESY cloud convectors (read-only).
-
-Adds rich telemetry based on the get-my-devices payload, including an estimated
-energy total derived from heating state + selected wattage.
-"""
+"""Sensor entities for MyTESY cloud convectors (read-only)."""
 
 from __future__ import annotations
 
@@ -154,7 +150,6 @@ SENSORS: tuple[_SensorDesc, ...] = (
         entity_category=None,
         value_fn=lambda c, m: _safe_float(_state(c, m).get("TCorrection")),
     ),
-    # Preset temps / timers
     _SensorDesc(
         key="comfort_temp",
         name="Comfort Temperature",
@@ -215,7 +210,6 @@ SENSORS: tuple[_SensorDesc, ...] = (
         entity_category=None,
         value_fn=lambda c, m: _safe_float((_state(c, m).get("delayedStart") or {}).get("temp")),
     ),
-    # Diagnostics
     _SensorDesc(
         key="firmware_version",
         name="Firmware Version",
@@ -256,16 +250,6 @@ SENSORS: tuple[_SensorDesc, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda c, m: _device(c, m).get("timezone"),
     ),
-    _SensorDesc(
-        key="device_time",
-        name="Device Time (reported)",
-        icon="mdi:clock-outline",
-        device_class=None,
-        state_class=None,
-        unit=None,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda c, m: _device(c, m).get("time"),
-    ),
 )
 
 
@@ -278,6 +262,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         for desc in SENSORS:
             entities.append(TesyCloudBasicSensor(coordinator, mac, desc))
         entities.append(TesyCloudEstimatedEnergySensor(coordinator, mac))
+        entities.append(TesyCloudHistoryHoursSensor(coordinator, mac, kind="status"))
+        entities.append(TesyCloudHistoryHoursSensor(coordinator, mac, kind="heating"))
 
     async_add_entities(entities)
 
@@ -286,7 +272,6 @@ class TesyCloudBasicSensor(CoordinatorEntity[TesyCloudCoordinator], SensorEntity
     def __init__(self, coordinator: TesyCloudCoordinator, mac: str, desc: _SensorDesc) -> None:
         super().__init__(coordinator)
         self._mac = mac
-        self.entity_description = None  # to keep HA from trying to auto-map
         self._desc = desc
 
         base_name = _payload(coordinator, mac).get("name") or f"Tesy Convector {mac.replace(':','')[-6:]}"
@@ -308,12 +293,7 @@ class TesyCloudBasicSensor(CoordinatorEntity[TesyCloudCoordinator], SensorEntity
 
 
 class TesyCloudEstimatedEnergySensor(CoordinatorEntity[TesyCloudCoordinator], SensorEntity, RestoreEntity):
-    """Estimated energy (kWh) based on heating on/off and selected wattage.
-
-    Important: `state.watt` appears to represent selected heater power (W), not a live meter.
-    We only accumulate while `state.heating == "on"`.
-    """
-
+    """Estimated energy (kWh) from heating on/off and selected wattage."""
     _attr_device_class = SensorDeviceClass.ENERGY
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
@@ -325,7 +305,6 @@ class TesyCloudEstimatedEnergySensor(CoordinatorEntity[TesyCloudCoordinator], Se
         base_name = _payload(coordinator, mac).get("name") or f"Tesy Convector {mac.replace(':','')[-6:]}"
         self._attr_name = f"{base_name} Energy (estimated)"
         self._attr_unique_id = f"{mac}_energy_estimated"
-
         self._energy_kwh: float = 0.0
         self._last_ts = dt_util.utcnow()
 
@@ -349,14 +328,11 @@ class TesyCloudEstimatedEnergySensor(CoordinatorEntity[TesyCloudCoordinator], Se
 
     @property
     def native_value(self) -> float:
-        # Update accumulation on every state read (coordinator refreshes periodically).
         now = dt_util.utcnow()
         dt_seconds = (now - self._last_ts).total_seconds()
         if dt_seconds < 0:
             dt_seconds = 0
-        # Cap to avoid huge jumps if system time changed or long downtime.
-        dt_seconds = min(dt_seconds, 6 * 3600)
-
+        dt_seconds = min(dt_seconds, 6 * 3600)  # cap long jumps
         p_w = self._effective_power_w()
         self._energy_kwh += (p_w / 1000.0) * (dt_seconds / 3600.0)
         self._last_ts = now
@@ -372,3 +348,36 @@ class TesyCloudEstimatedEnergySensor(CoordinatorEntity[TesyCloudCoordinator], Se
             "effective_power_w": self._effective_power_w(),
             "note": "Estimated from heating state + selected power; not a calibrated meter.",
         }
+
+
+class TesyCloudHistoryHoursSensor(CoordinatorEntity[TesyCloudCoordinator], SensorEntity):
+    """Rolling 30-day time-on sensor, persisted by integration history storage."""
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UnitOfTime.HOURS
+
+    def __init__(self, coordinator: TesyCloudCoordinator, mac: str, kind: str) -> None:
+        super().__init__(coordinator)
+        self._mac = mac
+        self._kind = kind  # "status" or "heating"
+        base_name = _payload(coordinator, mac).get("name") or f"Tesy Convector {mac.replace(':','')[-6:]}"
+        if kind == "status":
+            self._attr_name = f"{base_name} Power On Time (last 30 days)"
+            self._attr_unique_id = f"{mac}_power_on_time_30d"
+            self._attr_icon = "mdi:power-plug"
+        else:
+            self._attr_name = f"{base_name} Heating Time (last 30 days)"
+            self._attr_unique_id = f"{mac}_heating_time_30d"
+            self._attr_icon = "mdi:radiator"
+
+    @property
+    def native_value(self) -> float:
+        hist = getattr(self.coordinator, "_history", None)
+        if hist is None:
+            return 0.0
+        if self._kind == "status":
+            return hist.get_hours_last_days(self._mac, "status", days=30)
+        return hist.get_hours_last_days(self._mac, "heating", days=30)
+
+    @property
+    def device_info(self):
+        return _device_info(self.coordinator, self._mac)

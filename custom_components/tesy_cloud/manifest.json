@@ -1,15 +1,11 @@
 {
-  "domain": "tesy_cloud",
+  "domain": "tesy",
   "name": "MyTESY Cloud Convector",
-  "version": "0.3.3",
-  "documentation": "https://github.com/Kosztyk/MyTesyCloud/blob/main/README.md",
-  "issue_tracker": "https://github.com/Kosztyk/MyTesyCloud/issues",
-  "requirements": [],
-  "codeowners": ["kosztyk"],
+  "codeowners": [],
   "config_flow": true,
+  "documentation": "",
   "iot_class": "cloud_polling",
-  "integration_type": "device",
-  "loggers": [
-    "tesy_cloud"
-  ]
+  "issue_tracker": "",
+  "requirements": [],
+  "version": "0.5.1"
 }

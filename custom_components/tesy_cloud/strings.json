@@ -1,9 +1,10 @@
 {
+  "title": "MyTESY Cloud Convector",
   "config": {
     "step": {
       "user": {
-        "title": "Connect to MyTESY",
-        "description": "Uses the MyTESY v4 cloud endpoint get-my-devices. Read-only entities (no control yet).",
+        "title": "MyTESY Cloud Convector",
+        "description": "Read-only integration based on MyTESY v4 cloud endpoint.",
         "data": {
           "username": "E-mail",
           "password": "Password",
@@ -12,12 +13,9 @@
       }
     },
     "error": {
-      "auth": "Authentication failed (server returned error=1).",
-      "cannot_connect": "Unable to connect to MyTESY Cloud.",
+      "auth": "Authentication failed. Check e-mail/password/user_id.",
+      "cannot_connect": "Cannot connect to MyTESY cloud.",
       "unknown": "Unexpected error."
-    },
-    "abort": {
-      "already_configured": "This MyTESY account is already configured."
     }
   }
 }

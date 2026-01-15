@@ -1,40 +1,42 @@
-"""MyTESY Cloud Convector integration."""
+"""The tesy integration."""
 
 from __future__ import annotations
 
 from datetime import timedelta
-import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import TesyCloudApi
+from .const import DOMAIN, CONF_USERNAME, CONF_PASSWORD, CONF_USER_ID, DEFAULT_SCAN_INTERVAL
 from .coordinator import TesyCloudCoordinator
-from .const import DOMAIN, DEFAULT_SCAN_INTERVAL, CONF_USER_ID, CONF_USERNAME, CONF_PASSWORD
-
-_LOGGER = logging.getLogger(__name__)
+from .history import TesyHistoryManager
 
 PLATFORMS: list[str] = ["climate", "sensor", "binary_sensor"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    api = TesyCloudApi(
-        session=async_get_clientsession(hass),
-        user_id=entry.data[CONF_USER_ID],
-        username=entry.data[CONF_USERNAME],
-        password=entry.data[CONF_PASSWORD],
-    )
+    session = async_get_clientsession(hass)
+    username = entry.data[CONF_USERNAME]
+    password = entry.data[CONF_PASSWORD]
+    user_id = entry.data[CONF_USER_ID]
 
-    coordinator = TesyCloudCoordinator(
-        hass=hass,
-        api=api,
-        update_interval=timedelta(seconds=int(entry.options.get("scan_interval", DEFAULT_SCAN_INTERVAL))),
-    )
+    api = TesyCloudApi(session, username, password, user_id)
+
+    history = TesyHistoryManager(hass, entry.entry_id, keep_days=30)
+    await history.async_load()
+
+    update_interval = timedelta(seconds=DEFAULT_SCAN_INTERVAL)
+    coordinator = TesyCloudCoordinator(hass, api, update_interval, history=history)
+
     await coordinator.async_config_entry_first_refresh()
 
-    hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = {"coordinator": coordinator}
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
+        "api": api,
+        "coordinator": coordinator,
+        "history": history,
+    }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True

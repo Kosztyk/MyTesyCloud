@@ -15,21 +15,23 @@ from .const import DOMAIN
 from .coordinator import TesyCloudCoordinator
 
 
-def _safe_float(v: Any) -> float | None:
-    try:
-        if v is None:
-            return None
-        return float(v)
-    except Exception:
-        return None
+def _payload(coordinator: TesyCloudCoordinator, mac: str) -> dict[str, Any]:
+    return (coordinator.data or {}).get(mac) or {}
+
+
+def _state(coordinator: TesyCloudCoordinator, mac: str) -> dict[str, Any]:
+    st = _payload(coordinator, mac).get("state") or {}
+    return st if isinstance(st, dict) else {}
+
+
+def _device(coordinator: TesyCloudCoordinator, mac: str) -> dict[str, Any]:
+    dev = _payload(coordinator, mac).get("device") or {}
+    return dev if isinstance(dev, dict) else {}
 
 
 def _is_on(state: dict[str, Any]) -> bool:
-    # state.status: "on"/"off"
     s = state.get("status")
-    if isinstance(s, str):
-        return s.lower() == "on"
-    return False
+    return isinstance(s, str) and s.lower() == "on"
 
 
 def _hvac_action(state: dict[str, Any]) -> HVACAction:
@@ -43,76 +45,81 @@ def _hvac_action(state: dict[str, Any]) -> HVACAction:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     coordinator: TesyCloudCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    entities: list[ClimateEntity] = []
+    for mac in (coordinator.data or {}).keys():
+        entities.append(TesyCloudClimate(coordinator, mac))
+    async_add_entities(entities)
 
-    macs = list((coordinator.data or {}).keys())
-    async_add_entities([TesyCloudConvector(coordinator, mac) for mac in macs])
 
-
-class TesyCloudConvector(CoordinatorEntity[TesyCloudCoordinator], ClimateEntity):
-    """A read-only climate entity."""
-
+class TesyCloudClimate(CoordinatorEntity[TesyCloudCoordinator], ClimateEntity):
     _attr_temperature_unit = "°C"
     _attr_hvac_modes = [HVACMode.HEAT, HVACMode.OFF]
 
     def __init__(self, coordinator: TesyCloudCoordinator, mac: str) -> None:
         super().__init__(coordinator)
         self._mac = mac
+        base_name = _payload(coordinator, mac).get("name") or f"Tesy Convector {mac.replace(':','')[-6:]}"
+        self._attr_name = base_name
         self._attr_unique_id = mac
-
-    def _payload(self) -> dict[str, Any]:
-        return (self.coordinator.data or {}).get(self._mac) or {}
-
-    def _device(self) -> dict[str, Any]:
-        dev = self._payload().get("device") or {}
-        return dev if isinstance(dev, dict) else {}
-
-    def _state(self) -> dict[str, Any]:
-        st = self._payload().get("state") or {}
-        return st if isinstance(st, dict) else {}
-
-    @property
-    def name(self) -> str:
-        return self._payload().get("name") or f"Tesy Convector {self._mac.replace(':','')[-6:]}"
-
-    @property
-    def current_temperature(self) -> float | None:
-        # In your response: state.current_temp
-        return _safe_float(self._state().get("current_temp"))
-
-    @property
-    def target_temperature(self) -> float | None:
-        # In your response: state.temp (setpoint)
-        return _safe_float(self._state().get("temp"))
-
-    @property
-    def hvac_mode(self) -> HVACMode:
-        return HVACMode.HEAT if _is_on(self._state()) else HVACMode.OFF
-
-    @property
-    def hvac_action(self) -> HVACAction:
-        return _hvac_action(self._state())
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        st = self._state()
-        return {
-            "opened_window": st.get("openedWindow"),
-            "anti_frost": st.get("antiFrost"),
-            "locked": st.get("lockedDevice"),
-            "mode": st.get("mode"),
-            "heating": st.get("heating"),
-            "watt": st.get("watt"),
-        }
 
     @property
     def device_info(self):
-        dev = self._device()
+        dev = _device(self.coordinator, self._mac)
         model = dev.get("model_type") or dev.get("model") or "Cloud Convector"
         sw = dev.get("firmware_version")
         return {
             "identifiers": {(DOMAIN, self._mac)},
             "manufacturer": "TESY",
-            "name": self.name,
+            "name": self._attr_name,
             "model": model,
             "sw_version": sw,
         }
+
+    @property
+    def hvac_modes(self):
+        return [HVACMode.OFF, HVACMode.HEAT]
+
+    @property
+    def hvac_mode(self) -> HVACMode:
+        return HVACMode.HEAT if _is_on(_state(self.coordinator, self._mac)) else HVACMode.OFF
+
+    @property
+    def hvac_action(self) -> HVACAction:
+        return _hvac_action(_state(self.coordinator, self._mac))
+
+    @property
+    def current_temperature(self) -> float | None:
+        v = _state(self.coordinator, self._mac).get("current_temp")
+        try:
+            return float(v)
+        except Exception:  # noqa: BLE001
+            return None
+
+    @property
+    def target_temperature(self) -> float | None:
+        v = _state(self.coordinator, self._mac).get("temp")
+        try:
+            return float(v)
+        except Exception:  # noqa: BLE001
+            return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        st = _state(self.coordinator, self._mac)
+        # expose useful raw fields as attributes
+        keys = [
+            "watt",
+            "status",
+            "heating",
+            "openedWindow",
+            "antiFrost",
+            "lockedDevice",
+            "uv",
+            "adaptiveStart",
+            "mode",
+            "programStatus",
+            "timeRemaining",
+            "modeTime",
+            "TCorrection",
+        ]
+        return {k: st.get(k) for k in keys if k in st}
