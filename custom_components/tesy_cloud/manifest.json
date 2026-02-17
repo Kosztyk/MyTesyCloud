@@ -1,5 +1,5 @@
 {
-  "domain": "tesy",
+  "domain": "tesy_cloud",
   "name": "MyTESY Cloud Convector",
   "codeowners": [],
   "config_flow": true,
