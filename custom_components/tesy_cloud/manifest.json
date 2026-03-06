@@ -1,11 +1,13 @@
 {
-  "domain": "tesy_cloud",
+  "domain": "tesy",
   "name": "MyTESY Cloud Convector",
   "codeowners": [],
   "config_flow": true,
   "documentation": "",
   "iot_class": "cloud_polling",
   "issue_tracker": "",
-  "requirements": [],
-  "version": "0.5.1"
+  "requirements": [
+    "paho-mqtt>=2.1.0"
+  ],
+  "version": "0.6.0"
 }

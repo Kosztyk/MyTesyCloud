@@ -22,7 +22,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     password = entry.data[CONF_PASSWORD]
     user_id = entry.data[CONF_USER_ID]
 
-    api = TesyCloudApi(session, username, password, user_id)
+    api = TesyCloudApi(session, username, password, user_id, app_id=entry.entry_id.replace("-", "")[:16])
 
     history = TesyHistoryManager(hass, entry.entry_id, keep_days=30)
     await history.async_load()
