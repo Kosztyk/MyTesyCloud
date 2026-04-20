@@ -15,9 +15,7 @@ from homeassistant.const import UnitOfEnergy, UnitOfPower, UnitOfTemperature, Un
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from .coordinator import TesyCloudCoordinator
@@ -47,6 +45,13 @@ def _state_on(v: Any) -> bool:
     if isinstance(v, bool):
         return v
     return False
+
+
+def _robust_power_on_hours(hist: Any, mac: str) -> float:
+    """Power-on time cannot be lower than heating time for the same window."""
+    status_hours = hist.get_hours_last_days(mac, "status", days=30)
+    heating_hours = hist.get_hours_last_days(mac, "heating", days=30)
+    return round(max(status_hours, heating_hours), 3)
 
 
 def _payload(coordinator: TesyCloudCoordinator, mac: str) -> dict[str, Any]:
@@ -292,10 +297,12 @@ class TesyCloudBasicSensor(CoordinatorEntity[TesyCloudCoordinator], SensorEntity
         return _device_info(self.coordinator, self._mac)
 
 
-class TesyCloudEstimatedEnergySensor(CoordinatorEntity[TesyCloudCoordinator], SensorEntity, RestoreEntity):
-    """Estimated energy (kWh) from heating on/off and selected wattage."""
+
+class TesyCloudEstimatedEnergySensor(CoordinatorEntity[TesyCloudCoordinator], SensorEntity):
+    """Rolling 30-day estimated energy (kWh) from heating history and selected wattage."""
+
     _attr_device_class = SensorDeviceClass.ENERGY
-    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
     _attr_icon = "mdi:counter"
 
@@ -303,40 +310,22 @@ class TesyCloudEstimatedEnergySensor(CoordinatorEntity[TesyCloudCoordinator], Se
         super().__init__(coordinator)
         self._mac = mac
         base_name = _payload(coordinator, mac).get("name") or f"Tesy Convector {mac.replace(':','')[-6:]}"
-        self._attr_name = f"{base_name} Energy (estimated)"
+        self._attr_name = f"{base_name} Energy (estimated, last 30 days)"
         self._attr_unique_id = f"{mac}_energy_estimated"
-        self._energy_kwh: float = 0.0
-        self._last_ts = dt_util.utcnow()
 
-    async def async_added_to_hass(self) -> None:
-        await super().async_added_to_hass()
-        last = await self.async_get_last_state()
-        if last and last.state not in (None, "unknown", "unavailable"):
-            try:
-                self._energy_kwh = float(last.state)
-            except Exception:
-                self._energy_kwh = 0.0
-        self._last_ts = dt_util.utcnow()
-
-    def _effective_power_w(self) -> float:
+    def _configured_power_w(self) -> float:
         st = _state(self.coordinator, self._mac)
-        heating = _state_on(st.get("heating"))
-        if not heating:
-            return 0.0
         w = _safe_float(st.get("watt"))
         return float(w) if w is not None else 0.0
 
     @property
     def native_value(self) -> float:
-        now = dt_util.utcnow()
-        dt_seconds = (now - self._last_ts).total_seconds()
-        if dt_seconds < 0:
-            dt_seconds = 0
-        dt_seconds = min(dt_seconds, 6 * 3600)  # cap long jumps
-        p_w = self._effective_power_w()
-        self._energy_kwh += (p_w / 1000.0) * (dt_seconds / 3600.0)
-        self._last_ts = now
-        return round(self._energy_kwh, 4)
+        hist = getattr(self.coordinator, "_history", None)
+        if hist is None:
+            return 0.0
+        heating_hours = hist.get_hours_last_days(self._mac, "heating", days=30)
+        power_kw = self._configured_power_w() / 1000.0
+        return round(heating_hours * power_kw, 2)
 
     @property
     def device_info(self):
@@ -344,9 +333,15 @@ class TesyCloudEstimatedEnergySensor(CoordinatorEntity[TesyCloudCoordinator], Se
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
+        hist = getattr(self.coordinator, "_history", None)
+        heating_hours = hist.get_hours_last_days(self._mac, "heating", days=30) if hist is not None else 0.0
+        power_hours = _robust_power_on_hours(hist, self._mac) if hist is not None else 0.0
         return {
-            "effective_power_w": self._effective_power_w(),
-            "note": "Estimated from heating state + selected power; not a calibrated meter.",
+            "window_days": 30,
+            "estimated_from_heating_hours": heating_hours,
+            "power_on_hours_last_30d": power_hours,
+            "configured_power_w": self._configured_power_w(),
+            "note": "Estimated from locally tracked 30-day heating hours and the currently reported wattage; not a calibrated meter.",
         }
 
 
@@ -375,9 +370,26 @@ class TesyCloudHistoryHoursSensor(CoordinatorEntity[TesyCloudCoordinator], Senso
         if hist is None:
             return 0.0
         if self._kind == "status":
-            return hist.get_hours_last_days(self._mac, "status", days=30)
+            return _robust_power_on_hours(hist, self._mac)
         return hist.get_hours_last_days(self._mac, "heating", days=30)
 
     @property
     def device_info(self):
         return _device_info(self.coordinator, self._mac)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        tracked = "power_on" if self._kind == "status" else "heating"
+        attrs = {
+            "tracked_metric": tracked,
+            "window_days": 30,
+            "display_unit": "h",
+            "note": "Rolling 30-day time tracked locally by the integration, not authoritative TESY cloud history.",
+        }
+        if self._kind == "status":
+            hist = getattr(self.coordinator, "_history", None)
+            if hist is not None:
+                attrs["raw_status_hours_last_30d"] = hist.get_hours_last_days(self._mac, "status", days=30)
+                attrs["heating_hours_last_30d"] = hist.get_hours_last_days(self._mac, "heating", days=30)
+                attrs["calculated_as"] = "max(raw_status_hours, heating_hours)"
+        return attrs

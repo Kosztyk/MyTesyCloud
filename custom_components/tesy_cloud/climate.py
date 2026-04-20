@@ -17,6 +17,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .api import TesyCloudError
 from .const import DOMAIN
 from .coordinator import TesyCloudCoordinator
+from .status import cloud_connected, derived_power_on, heating_active, stale_active_state
 
 PRESET_COMFORT = "comfort"
 PRESET_ECO = "eco"
@@ -42,13 +43,9 @@ def _device(coordinator: TesyCloudCoordinator, mac: str) -> dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
-def _is_on(state: dict[str, Any]) -> bool:
-    s = state.get("status")
-    return isinstance(s, str) and s.lower() == "on"
-
 
 def _hvac_action(state: dict[str, Any]) -> HVACAction:
-    if not _is_on(state):
+    if not derived_power_on(state):
         return HVACAction.OFF
     h = state.get("heating")
     if isinstance(h, str) and h.lower() == "on":
@@ -80,6 +77,14 @@ class TesyCloudClimate(CoordinatorEntity[TesyCloudCoordinator], ClimateEntity):
         self._attr_name = base_name
         self._attr_unique_id = mac
 
+
+    @property
+    def available(self) -> bool:
+        # Keep idle devices available; Tesy often stops updating timestamps while
+        # the heater is simply off/idle. Control path still exists as long as the
+        # device is present in the account snapshot.
+        return bool(_payload(self.coordinator, self._mac))
+
     @property
     def device_info(self):
         dev = _device(self.coordinator, self._mac)
@@ -95,7 +100,7 @@ class TesyCloudClimate(CoordinatorEntity[TesyCloudCoordinator], ClimateEntity):
 
     @property
     def hvac_mode(self) -> HVACMode:
-        return HVACMode.HEAT if _is_on(_state(self.coordinator, self._mac)) else HVACMode.OFF
+        return HVACMode.HEAT if derived_power_on(_state(self.coordinator, self._mac)) else HVACMode.OFF
 
     @property
     def hvac_action(self) -> HVACAction:
@@ -142,7 +147,11 @@ class TesyCloudClimate(CoordinatorEntity[TesyCloudCoordinator], ClimateEntity):
             "modeTime",
             "TCorrection",
         ]
-        return {k: st.get(k) for k in keys if k in st}
+        attrs = {k: st.get(k) for k in keys if k in st}
+        attrs["cloud_connected"] = cloud_connected(_device(self.coordinator, self._mac), st)
+        attrs["stale_cloud_state"] = stale_active_state(st)
+        attrs["last_cloud_update"] = st.get("updated_at")
+        return attrs
 
     async def async_turn_on(self) -> None:
         device = _device(self.coordinator, self._mac)

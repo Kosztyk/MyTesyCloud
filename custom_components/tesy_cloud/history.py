@@ -22,6 +22,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
+from .status import derived_power_on_raw, is_state_fresh, stale_active_state, stale_transition_time, state_on
 
 STORAGE_VERSION = 1
 
@@ -58,6 +59,7 @@ def _parse_ts(value: Any) -> datetime | None:
         return None
 
 
+
 @dataclass
 class _Track:
     current_on: bool = False
@@ -66,6 +68,60 @@ class _Track:
 
     def normalize(self) -> None:
         self.intervals = [i for i in self.intervals if isinstance(i, list) and len(i) == 2]
+
+
+def _parse_iso_utc(value: str | None) -> datetime | None:
+    if not value or not isinstance(value, str):
+        return None
+    try:
+        dt = datetime.fromisoformat(value)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except Exception:
+        return None
+
+
+def _merge_intervals(intervals: list[list[str | None]]) -> list[list[str | None]]:
+    parsed: list[tuple[datetime, datetime | None]] = []
+    for item in intervals:
+        if not isinstance(item, list) or len(item) != 2:
+            continue
+        start = _parse_iso_utc(item[0])
+        end = _parse_iso_utc(item[1]) if item[1] else None
+        if start is None:
+            continue
+        if end is not None and end < start:
+            start, end = end, start
+        parsed.append((start, end))
+
+    parsed.sort(key=lambda x: x[0])
+    merged: list[list[str | None]] = []
+    for start, end in parsed:
+        if not merged:
+            merged.append([_iso(start), _iso(end) if end else None])
+            continue
+
+        last_start = _parse_iso_utc(merged[-1][0])
+        last_end = _parse_iso_utc(merged[-1][1]) if merged[-1][1] else None
+        if last_start is None:
+            merged.append([_iso(start), _iso(end) if end else None])
+            continue
+
+        # open interval swallows all later intervals
+        if last_end is None:
+            continue
+
+        overlaps = start <= last_end
+        touches = (start - last_end).total_seconds() <= 1
+        if overlaps or touches:
+            if end is None or last_end is None:
+                merged[-1][1] = None
+            elif end > last_end:
+                merged[-1][1] = _iso(end)
+        else:
+            merged.append([_iso(start), _iso(end) if end else None])
+    return merged
 
 
 class TesyHistoryManager:
@@ -78,7 +134,10 @@ class TesyHistoryManager:
         self._loaded = False
 
     async def async_load(self) -> None:
-        stored = await self._store.async_load()
+        try:
+            stored = await self._store.async_load()
+        except Exception:
+            stored = None
         self._data = {}
         if stored and isinstance(stored, dict):
             for mac, per in (stored.get("devices") or {}).items():
@@ -92,6 +151,8 @@ class TesyHistoryManager:
                 }
                 self._data[mac]["status"].normalize()
                 self._data[mac]["heating"].normalize()
+                self._data[mac]["status"].intervals = _merge_intervals(self._data[mac]["status"].intervals)
+                self._data[mac]["heating"].intervals = _merge_intervals(self._data[mac]["heating"].intervals)
 
         self._loaded = True
         self.prune_all(_utcnow())
@@ -132,7 +193,7 @@ class TesyHistoryManager:
                 for start_iso, end_iso in track.intervals:
                     if end_iso is None or end_iso >= cutoff_iso:
                         pruned.append([start_iso, end_iso])
-                track.intervals = pruned
+                track.intervals = _merge_intervals(pruned)
 
     def _apply_transition(self, track: _Track, new_on: bool, ts: datetime) -> bool:
         if new_on == track.current_on:
@@ -167,8 +228,16 @@ class TesyHistoryManager:
 
             ts = _parse_ts(st.get("updated_at")) or now
 
-            status_on = str(st.get("status", "")).lower() == "on"
-            heating_on = str(st.get("heating", "")).lower() == "on"
+            if stale_active_state(st, now):
+                stale_at = stale_transition_time(st, now)
+                ts = stale_at or now
+                status_on = False
+                heating_on = False
+            else:
+                status_on = derived_power_on_raw(st)
+                heating_on = state_on(st.get("heating"))
+                if heating_on:
+                    status_on = True
 
             tracks = self._ensure(mac)
             if self._apply_transition(tracks["status"], status_on, ts):
@@ -207,5 +276,15 @@ class TesyHistoryManager:
     def get_hours_last_days(self, mac: str, key: str, days: int = 30) -> float:
         now = _utcnow()
         track = self._ensure(mac)[key]
-        seconds = self._duration_seconds_in_window(track.intervals, now, days)
+        intervals = _merge_intervals(track.intervals)
+        seconds = self._duration_seconds_in_window(intervals, now, days)
+        max_seconds = float(days * 24 * 3600)
+        seconds = max(0.0, min(seconds, max_seconds))
         return round(seconds / 3600.0, 3)
+
+    async def async_reset(self, mac: str | None = None) -> None:
+        if mac:
+            self._data.pop(mac, None)
+        else:
+            self._data = {}
+        await self._save()

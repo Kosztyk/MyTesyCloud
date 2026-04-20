@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 import voluptuous as vol
 
 from homeassistant import config_entries
@@ -26,6 +27,7 @@ class TesyCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 username=user_input[CONF_USERNAME],
                 password=user_input[CONF_PASSWORD],
                 user_id=user_input[CONF_USER_ID],
+                app_id=uuid.uuid4().hex[:16],
             )
 
             try:

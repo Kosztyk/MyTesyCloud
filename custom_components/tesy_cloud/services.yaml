@@ -1,0 +1,10 @@
+reset_history:
+  name: Reset TESY history
+  description: Reset locally tracked 30-day TESY power/heating history.
+  fields:
+    mac:
+      name: MAC
+      description: Optional device MAC address. Leave empty to reset all TESY devices for all configured TESY entries.
+      example: E0:E2:E6:8F:06:AC
+      selector:
+        text: {}
