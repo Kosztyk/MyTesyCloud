@@ -6,13 +6,13 @@
 
 Unofficial Home Assistant custom integration for TESY MyTESY (TESY Cloud) **convectors** using the MyTESY **v4** cloud endpoint.
 
-This integration is **cloud polling** and currently provides **read-only** entities (monitoring only).
+This integration uses **cloud polling** for status and MQTT-over-WebSocket for power, temperature and preset commands. Sensors and binary sensors are read-only.
 
 ## Features
 
 Per device (per MAC address), the integration creates:
 
-- **Climate entity** (read-only)
+- **Climate entity** (controllable: on/off, target temperature and comfort/eco/sleep presets)
   - Current temperature (`state.current_temp`)
   - Target temperature / setpoint (`state.temp`)
   - HVAC mode inferred from `state.status` (`on`/`off`)
@@ -57,20 +57,28 @@ Per device (per MAC address), the integration creates:
 - Home Assistant with support for custom components.
 - Internet access from Home Assistant to the MyTESY endpoint (currently uses `https://ad.mytesy.com/rest/get-my-devices`).
 
+## HACS installation
+
+Before the integration is included in the default HACS catalog, open **HACS → Custom repositories**, add `https://github.com/Kosztyk/MyTesyCloud`, select **Integration**, install **MyTESY Cloud Convector**, and restart Home Assistant.
+
+After the catalog submission is accepted, the custom-repository step will not be necessary.
+
 ## Installation
 
-1. Copy the integration folder into Home Assistant:
+1. Copy the `tesy` integration folder into Home Assistant:
 
-   - Target path: `/config/custom_components/tesy_cloud/`
+   - Target path: `/config/custom_components/tesy/`
    - You should have files like:
-     - `/config/custom_components/tesy_cloud/manifest.json`
-     - `/config/custom_components/tesy_cloud/__init__.py`
-     - `/config/custom_components/tesy_cloud/api.py`
-     - `/config/custom_components/tesy_cloud/climate.py`
-     - `/config/custom_components/tesy_cloud/sensor.py`
-     - `/config/custom_components/tesy_cloud/binary_sensor.py`
+     - `/config/custom_components/tesy/manifest.json`
+     - `/config/custom_components/tesy/__init__.py`
+     - `/config/custom_components/tesy/api.py`
+     - `/config/custom_components/tesy/climate.py`
+     - `/config/custom_components/tesy/sensor.py`
+     - `/config/custom_components/tesy/binary_sensor.py`
 
 2. Restart Home Assistant.
+
+**Important when upgrading an existing manual installation:** the old folder name `custom_components/tesy_cloud` did not match the integration domain `tesy`. Remove the obsolete `tesy_cloud` folder, install the new `tesy` folder and restart Home Assistant. The Home Assistant integration domain remains `tesy`, so existing configuration entries are intended to remain usable.
 
 ## Setup (UI)
 
@@ -133,3 +141,11 @@ Tip: If you don’t see anything in Network, ensure “Preserve log” is enable
 
 This is an **unofficial** integration and is not affiliated with TESY.
 API behavior may change without notice.
+
+## Publication validation
+
+HACS, Hassfest and packaging checks are run by GitHub Actions. These do not test commands against a live TESY device. See [VALIDATION.md](VALIDATION.md).
+
+## License
+
+[MIT License](LICENSE.txt); [original Romanian translation](docs/licenta-originala-ro.md).
