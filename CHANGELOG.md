@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.2 — English fallback translation fix
+
+- Add `translations/en.json` matching `strings.json` as Frenck requested in HACS #12458.
+- Require and verify English translation in automated packaging checks.
+- No runtime protocol, control or sensor changes.
+
 ## 1.1.1 — HACS publishing readiness
 
 - Correct the component installation folder to `custom_components/tesy`, matching the existing Home Assistant domain `tesy`.
