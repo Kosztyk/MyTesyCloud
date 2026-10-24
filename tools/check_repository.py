@@ -10,7 +10,8 @@ def check(root=ROOT):
     errors=[]
     required=["README.md","LICENSE.txt","hacs.json",".github/workflows/validate.yml",
         "custom_components/tesy/__init__.py","custom_components/tesy/manifest.json",
-        "custom_components/tesy/strings.json","custom_components/tesy/brand/icon.png",
+        "custom_components/tesy/strings.json","custom_components/tesy/translations/en.json",
+        "custom_components/tesy/brand/icon.png",
         "docs/licenta-originala-ro.md"]
     for p in required:
         if not (root/p).is_file():
@@ -21,7 +22,7 @@ def check(root=ROOT):
     f=root/"custom_components/tesy/manifest.json"
     if f.is_file():
         m=json.loads(f.read_text())
-        if m.get("domain")!="tesy" or m.get("version")!="1.1.1":
+        if m.get("domain")!="tesy" or m.get("version")!="1.1.2":
             errors.append("Manifest domain/version invalid")
         if not m.get("codeowners") or not m.get("documentation") or not m.get("issue_tracker"):
             errors.append("Missing codeowner/docs/issues")
@@ -29,6 +30,14 @@ def check(root=ROOT):
             errors.append("Manifest key order invalid")
         if not re.fullmatch(r"\d+\.\d+\.\d+",str(m.get("version",""))):
             errors.append("Invalid version")
+    source=root/"custom_components/tesy/strings.json"
+    fallback=root/"custom_components/tesy/translations/en.json"
+    if source.is_file() and fallback.is_file():
+        try:
+            if json.loads(source.read_text(encoding="utf-8")) != json.loads(fallback.read_text(encoding="utf-8")):
+                errors.append("English fallback en.json must match strings.json")
+        except (ValueError, UnicodeDecodeError) as exc:
+            errors.append(f"Invalid translation JSON: {exc}")
     return errors
 if __name__=="__main__":
     problems=check()
