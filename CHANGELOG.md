@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — Hardware validation and accurate documentation
+## 1.1.3 — Hardware validation and accurate documentation
 
 - Document maintainer-confirmed power, temperature and mode control tests on two TESY CN06AS heaters, both reporting firmware 4.79.
 - Separate successful real-hardware validation from the scope of automated checks.
