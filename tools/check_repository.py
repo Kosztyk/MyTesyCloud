@@ -22,7 +22,7 @@ def check(root=ROOT):
     f=root/"custom_components/tesy/manifest.json"
     if f.is_file():
         m=json.loads(f.read_text())
-        if m.get("domain")!="tesy" or m.get("version")!="1.1.2":
+        if m.get("domain")!="tesy" or m.get("version")!="1.1.3":
             errors.append("Manifest domain/version invalid")
         if not m.get("codeowners") or not m.get("documentation") or not m.get("issue_tracker"):
             errors.append("Missing codeowner/docs/issues")

@@ -4,7 +4,7 @@
     "step": {
       "user": {
         "title": "MyTESY Cloud Convector",
-        "description": "Read-only integration based on MyTESY v4 cloud endpoint.",
+        "description": "Monitor your TESY convectors and control power, target temperature, and presets through MyTESY v4 cloud services.",
         "data": {
           "username": "E-mail",
           "password": "Password",
