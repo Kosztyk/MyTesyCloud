@@ -8,6 +8,24 @@ Unofficial Home Assistant custom integration for TESY MyTESY (TESY Cloud) **conv
 
 This integration uses **cloud polling** for status and MQTT-over-WebSocket for power, temperature and preset commands. Sensors and binary sensors are read-only.
 
+## Tested hardware
+
+The maintainer has successfully tested the integration's write controls on
+**two physical TESY Convector CN06AS heaters**. Both devices report
+**firmware 4.79** in Home Assistant.
+
+| Control tested on both heaters | MQTT command | Result |
+| --- | --- | --- |
+| Power on/off | `onOff` | Successful on real hardware |
+| Target temperature changes | `setTemp` | Successful on real hardware |
+| Mode/preset changes | `setMode` | Successful on real hardware |
+
+This confirmation was provided by the maintainer on 2026-10-25; the firmware
+versions were checked in the Home Assistant device registry. It applies to
+these two CN06AS units and does not establish compatibility with every TESY
+model or firmware. See [VALIDATION.md](VALIDATION.md) for the separate scope
+of hardware testing and automated checks.
+
 ## Features
 
 Per device (per MAC address), the integration creates:
@@ -15,8 +33,8 @@ Per device (per MAC address), the integration creates:
 - **Climate entity** (controllable: on/off, target temperature and comfort/eco/sleep presets)
   - Current temperature (`state.current_temp`)
   - Target temperature / setpoint (`state.temp`)
-  - HVAC mode inferred from `state.status` (`on`/`off`)
-  - HVAC action inferred from `state.heating` (`heating`/`idle`/`off`)
+  - HVAC mode derived from `state.status` and `state.heating`, with stale active-state handling
+  - HVAC action (`heating`/`idle`/`off`) derived from the power state and `state.heating`
 
 - **Sensors** (read-only)
   - Heater power (`state.watt`)
@@ -35,20 +53,21 @@ Per device (per MAC address), the integration creates:
   - Wi‑Fi SSID (diagnostic)
   - Reported WAN IP (diagnostic)
   - Device timezone (diagnostic)
-  - Device reported date/time (diagnostic)
-  - **Estimated energy total (kWh)** (diagnostic)
-    - Accumulates when `state.heating == "on"` using `state.watt` as instantaneous power.
-    - This is an estimate (not a meter-grade reading).
+  - **Energy (estimated, last 30 days)** (kWh; regular sensor)
+    - Calculated as locally tracked heating hours over the last 30 days multiplied by the currently reported `state.watt` divided by 1000.
+    - This rolling estimate can decrease as older heating history leaves the window, or change when the reported wattage changes. It is not a cumulative energy counter or a calibrated meter reading.
+  - **Power On Time (last 30 days)** (hours; regular sensor)
+  - **Heating Time (last 30 days)** (hours; regular sensor)
 
 - **Binary sensors** (read-only)
-  - Device on (`state.status`)
-  - Heating active (`state.heating`)
+  - Device on (derived from `state.status` and `state.heating`, with stale active-state handling)
+  - Heating active (`state.heating`, with stale active-state handling)
   - Open window detected (`state.openedWindow`)
   - Anti‑frost enabled (`state.antiFrost`)
   - Device locked (`state.lockedDevice`)
   - UV enabled (`state.uv`)
   - Adaptive start enabled (`state.adaptiveStart`)
-  - Has internet (diagnostic) (`hasInternet`)
+  - Has internet (diagnostic; inferred from cloud-state freshness and idle presence, with the raw `hasInternet` value exposed as an attribute)
   - Waiting for connection (diagnostic) (`waitingForConnection`)
 
 ## Requirements
