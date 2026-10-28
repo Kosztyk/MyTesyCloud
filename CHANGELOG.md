@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.5 — Cumulative estimated energy and Energy dashboard compatibility
+
+- Correct rolling 30-day energy estimate metadata: remove incompatible measurement state class.
+- Add persisted cumulative energy estimate (`total_increasing`, kWh) suitable for the Energy dashboard.
+- Cap accumulation across polling gaps at 120 seconds.
+- Add tests for cumulative accounting, persistence, restart and reset behavior.
+- Document manual replacement of previously selected Energy dashboard sensors.
+
+
 ## 1.1.4 — Fix climate switching to Off during heating
 
 - Keep climate HVAC mode in Heat when the last reported power status is On, even if the TESY cloud timestamp is stale.

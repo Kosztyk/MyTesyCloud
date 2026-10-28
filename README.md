@@ -172,3 +172,15 @@ HACS, Hassfest and packaging checks are run by GitHub Actions. These do not test
 ## License
 
 [MIT License](LICENSE.txt); [original Romanian translation](docs/licenta-originala-ro.md).
+
+
+## v1.1.5: Energy dashboard migration
+
+**Important:** Upgrading does not automatically replace the energy entity selected in Home Assistant.
+
+- Existing `*_energy_estimated`: rolling 30-day estimate, not eligible as an Energy dashboard consumption source. It can decrease, so it deliberately has no state class.
+- New `*_energy_total_estimated`: persistent cumulative estimated kWh, with `total_increasing`, designed for Energy dashboard statistics. It starts at zero on the first observation after installing v1.1.5.
+
+To remove **Unexpected state class** warnings: open **Settings → Dashboards → Energy → Individual electrical devices**, edit each TESY device, replace its old `*_energy_estimated` sensor with its new **Energy Total (estimated)** sensor, and save. If the new sensor is not listed, search for `energy_total` in **Settings → Devices & services → Entities** and verify it is enabled. Entity IDs may vary.
+
+The cumulative value is estimated using observed heating activity and currently reported wattage. It is not a calibrated consumption meter; long cloud polling gaps are capped at 120 seconds.

@@ -132,6 +132,7 @@ class TesyHistoryManager:
         self._store = Store(hass, STORAGE_VERSION, f"{DOMAIN}_{entry_id}_history")
         self._data: dict[str, dict[str, _Track]] = {}
         self._loaded = False
+        self._energy: dict[str, dict[str, Any]] = {}
 
     async def async_load(self) -> None:
         try:
@@ -139,6 +140,7 @@ class TesyHistoryManager:
         except Exception:
             stored = None
         self._data = {}
+        self._energy = {}
         if stored and isinstance(stored, dict):
             for mac, per in (stored.get("devices") or {}).items():
                 if not isinstance(per, dict):
@@ -154,12 +156,23 @@ class TesyHistoryManager:
                 self._data[mac]["status"].intervals = _merge_intervals(self._data[mac]["status"].intervals)
                 self._data[mac]["heating"].intervals = _merge_intervals(self._data[mac]["heating"].intervals)
 
+        if isinstance(stored, dict):
+            for mac, energy in (stored.get("energy_total") or {}).items():
+                if isinstance(energy, dict):
+                    self._energy[mac] = {
+                        "kwh": max(0.0, float(energy.get("kwh", 0))),
+                        "last_sample": energy.get("last_sample"),
+                        "last_heating": bool(energy.get("last_heating", False)),
+                        "last_watts": max(0.0, float(energy.get("last_watts", 0))),
+                    }
+
         self._loaded = True
         self.prune_all(_utcnow())
         await self._save()
 
     async def _save(self) -> None:
         payload = {
+            "energy_total": self._energy,
             "devices": {
                 mac: {
                     "status": {
@@ -239,6 +252,25 @@ class TesyHistoryManager:
                 if heating_on:
                     status_on = True
 
+            # Cumulative estimate from observed intervals; limit prolonged gaps.
+            energy = self._energy.setdefault(mac, {
+                "kwh": 0.0, "last_sample": None,
+                "last_heating": False, "last_watts": 0.0,
+            })
+            previous_sample = _parse_iso_utc(energy.get("last_sample"))
+            if previous_sample is not None and energy.get("last_heating"):
+                elapsed = min(max(0.0, (now - previous_sample).total_seconds()), 120.0)
+                addition = elapsed * float(energy.get("last_watts", 0.0)) / 3_600_000.0
+                if addition > 0:
+                    energy["kwh"] += addition
+            energy["last_sample"] = _iso(now)
+            energy["last_heating"] = heating_on
+            try:
+                energy["last_watts"] = max(0.0, float(st.get("watt") or 0))
+            except (TypeError, ValueError):
+                energy["last_watts"] = 0.0
+            changed = True
+
             tracks = self._ensure(mac)
             if self._apply_transition(tracks["status"], status_on, ts):
                 changed = True
@@ -282,9 +314,15 @@ class TesyHistoryManager:
         seconds = max(0.0, min(seconds, max_seconds))
         return round(seconds / 3600.0, 3)
 
+    def get_total_energy_kwh(self, mac: str) -> float:
+        """Estimated cumulative kWh persisted independently of 30-day history."""
+        return round(self._energy.get(mac, {}).get("kwh", 0.0), 4)
+
     async def async_reset(self, mac: str | None = None) -> None:
         if mac:
             self._data.pop(mac, None)
+            self._energy.pop(mac, None)
         else:
             self._data = {}
+            self._energy = {}
         await self._save()

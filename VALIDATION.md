@@ -47,3 +47,8 @@ diagnostic entity. The README now describes that behavior and the two rolling
 ## Reference material
 
 A 9 MB standalone `tesy.js` reference bundle was moved to `reference/tesy.js` because it is not imported by the integration's Python modules.
+
+
+## v1.1.5 estimated energy validation
+
+The rolling 30-day energy sensor no longer claims `measurement` state class. The new cumulative sensor is `total_increasing` (kWh) and uses persistent history storage. Regression tests cover cumulative integration, persistence, resets, and energy sensor metadata. The existing Home Assistant Energy dashboard device selections require manual migration to the new sensor; changing metadata cannot automatically change the dashboard source.

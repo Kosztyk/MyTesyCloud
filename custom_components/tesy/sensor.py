@@ -267,6 +267,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         for desc in SENSORS:
             entities.append(TesyCloudBasicSensor(coordinator, mac, desc))
         entities.append(TesyCloudEstimatedEnergySensor(coordinator, mac))
+        entities.append(TesyCloudTotalEnergySensor(coordinator, mac))
         entities.append(TesyCloudHistoryHoursSensor(coordinator, mac, kind="status"))
         entities.append(TesyCloudHistoryHoursSensor(coordinator, mac, kind="heating"))
 
@@ -302,7 +303,7 @@ class TesyCloudEstimatedEnergySensor(CoordinatorEntity[TesyCloudCoordinator], Se
     """Rolling 30-day estimated energy (kWh) from heating history and selected wattage."""
 
     _attr_device_class = SensorDeviceClass.ENERGY
-    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_state_class = None  # Rolling 30-day estimate can decrease.
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
     _attr_icon = "mdi:counter"
 
@@ -393,3 +394,35 @@ class TesyCloudHistoryHoursSensor(CoordinatorEntity[TesyCloudCoordinator], Senso
                 attrs["heating_hours_last_30d"] = hist.get_hours_last_days(self._mac, "heating", days=30)
                 attrs["calculated_as"] = "max(raw_status_hours, heating_hours)"
         return attrs
+
+
+class TesyCloudTotalEnergySensor(CoordinatorEntity[TesyCloudCoordinator], SensorEntity):
+    """Persistent cumulative energy estimate suitable for long-term statistics."""
+
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+    _attr_icon = "mdi:lightning-bolt"
+
+    def __init__(self, coordinator: TesyCloudCoordinator, mac: str) -> None:
+        super().__init__(coordinator)
+        self._mac = mac
+        base_name = _payload(coordinator, mac).get("name") or f"Tesy Convector {mac.replace(':', '')[-6:]}"
+        self._attr_name = f"{base_name} Energy Total (estimated)"
+        self._attr_unique_id = f"{mac}_energy_total_estimated"
+
+    @property
+    def native_value(self) -> float:
+        hist = getattr(self.coordinator, "_history", None)
+        return hist.get_total_energy_kwh(self._mac) if hist is not None else 0.0
+
+    @property
+    def device_info(self):
+        return _device_info(self.coordinator, self._mac)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {
+            "note": "Estimated from observed heating state and configured wattage; not a calibrated energy meter.",
+            "starts_at": "first observation after installing v1.1.5",
+        }
