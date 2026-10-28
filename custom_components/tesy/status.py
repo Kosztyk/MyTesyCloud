@@ -51,18 +51,13 @@ def stale_transition_time(state: dict[str, Any], now: datetime | None = None) ->
 
 
 def derived_power_on_raw(state: dict[str, Any]) -> bool:
-    """Best-effort current power state.
-
-    For these Tesy convectors the only consistently useful real-time flags are
-    ``status`` and ``heating``. Preset/mode fields can remain set while the unit
-    is merely configured, and using them as proof of runtime causes false
-    "on/idle" and false "disconnected" states.
-    """
-    if state_on(state.get("status")):
-        return True
-    if state_on(state.get("heating")):
-        return True
-    return False
+    """Resolve power from the explicit status; heating describes action, not mode."""
+    reported_status = state.get("status")
+    if isinstance(reported_status, bool):
+        return reported_status
+    if isinstance(reported_status, str) and reported_status.lower() in ("on", "off"):
+        return reported_status.lower() == "on"
+    return state_on(state.get("heating"))
 
 
 def stale_active_state(state: dict[str, Any], now: datetime | None = None) -> bool:
@@ -77,15 +72,13 @@ def stale_active_state(state: dict[str, Any], now: datetime | None = None) -> bo
 
 
 def derived_power_on(state: dict[str, Any], now: datetime | None = None) -> bool:
-    if stale_active_state(state, now=now):
-        return False
+    """Stale cloud observations must not change the reported HVAC mode to Off."""
     return derived_power_on_raw(state)
 
 
 def heating_active(state: dict[str, Any], now: datetime | None = None) -> bool:
-    if stale_active_state(state, now=now):
-        return False
-    return state_on(state.get("heating"))
+    """Current heating action, separate from reported power state."""
+    return derived_power_on_raw(state) and state_on(state.get("heating"))
 
 
 def cloud_connected(device: dict[str, Any], state: dict[str, Any], now: datetime | None = None) -> bool:

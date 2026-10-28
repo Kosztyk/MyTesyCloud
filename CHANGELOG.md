@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.4 — Fix climate switching to Off during heating
+
+- Keep climate HVAC mode in Heat when the last reported power status is On, even if the TESY cloud timestamp is stale.
+- Treat explicit device power status as authoritative; distinguish HVAC power mode from heating action.
+- Add focused regression tests for stale heating, idle, explicit Off, contradictory fields, and missing power status.
+- Confirm successful maintainer and user testing on the previously reported device types without claiming universal model compatibility.
+- Preserve existing commands, cloud authentication, sensors, and device entity IDs.
+
 ## 1.1.3 — Hardware validation and accurate documentation
 
 - Document maintainer-confirmed power, temperature and mode control tests on two TESY CN06AS heaters, both reporting firmware 4.79.

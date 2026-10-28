@@ -26,6 +26,10 @@ these two CN06AS units and does not establish compatibility with every TESY
 model or firmware. See [VALIDATION.md](VALIDATION.md) for the separate scope
 of hardware testing and automated checks.
 
+## v1.1.4 climate state correction
+
+The climate entity now keeps **Heat** when the last cloud-reported power mode is on, even if its update timestamp is old. Physical heating activity is shown separately as **Heating** or **Idle**. An explicit TESY `status: off` still shows **Off**. This regression was reported after v1.0.0 and confirmed fixed on the affected user's device; no changes were made to MQTT commands.
+
 ## Features
 
 Per device (per MAC address), the integration creates:
@@ -33,7 +37,7 @@ Per device (per MAC address), the integration creates:
 - **Climate entity** (controllable: on/off, target temperature and comfort/eco/sleep presets)
   - Current temperature (`state.current_temp`)
   - Target temperature / setpoint (`state.temp`)
-  - HVAC mode derived from `state.status` and `state.heating`, with stale active-state handling
+  - HVAC mode derived from the explicitly reported `state.status`, with `state.heating` used only as a fallback when status is absent; stale cloud timestamps never force Off
   - HVAC action (`heating`/`idle`/`off`) derived from the power state and `state.heating`
 
 - **Sensors** (read-only)
