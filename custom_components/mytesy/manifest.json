@@ -9,6 +9,7 @@
     "binary_sensor",
     "calendar",
     "climate",
+    "http",
     "number",
     "sensor",
     "switch",
