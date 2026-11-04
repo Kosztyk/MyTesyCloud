@@ -88,20 +88,20 @@ After the catalog submission is accepted, the custom-repository step will not be
 
 ## Installation
 
-1. Copy the `tesy` integration folder into Home Assistant:
+1. Copy the `mytesy` integration folder into Home Assistant:
 
-   - Target path: `/config/custom_components/tesy/`
+   - Target path: `/config/custom_components/mytesy/`
    - You should have files like:
-     - `/config/custom_components/tesy/manifest.json`
-     - `/config/custom_components/tesy/__init__.py`
-     - `/config/custom_components/tesy/api.py`
-     - `/config/custom_components/tesy/climate.py`
-     - `/config/custom_components/tesy/sensor.py`
-     - `/config/custom_components/tesy/binary_sensor.py`
+     - `/config/custom_components/mytesy/manifest.json`
+     - `/config/custom_components/mytesy/__init__.py`
+     - `/config/custom_components/mytesy/api.py`
+     - `/config/custom_components/mytesy/climate.py`
+     - `/config/custom_components/mytesy/sensor.py`
+     - `/config/custom_components/mytesy/binary_sensor.py`
 
 2. Restart Home Assistant.
 
-**Important when upgrading an existing manual installation:** the old folder name `custom_components/tesy_cloud` did not match the integration domain `tesy`. Remove the obsolete `tesy_cloud` folder, install the new `tesy` folder and restart Home Assistant. The Home Assistant integration domain remains `tesy`, so existing configuration entries are intended to remain usable.
+**Important when upgrading from the previous domain:** Back up Home Assistant before migrating. This integration now uses `mytesy` rather than `tesy`, so existing configuration entries must be removed and re-added. Remove the old `/config/custom_components/tesy/` directory only if it contains this MyTESY cloud integration; keep that folder if it belongs to the separate local TESY water-heater integration. Install `/config/custom_components/mytesy/`, restart Home Assistant, and configure the MyTESY Cloud Convector integration again. Entity IDs and long-term energy statistics may change or require manual migration; record your existing entity IDs and Energy dashboard selections, and do not delete historical Recorder statistics. The new domain allows both cloud and local TESY integrations to coexist.
 
 ## Setup (UI)
 

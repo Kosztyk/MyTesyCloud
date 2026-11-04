@@ -1,4 +1,4 @@
-"""Config flow for tesy."""
+"""Config flow for mytesy."""
 
 from __future__ import annotations
 

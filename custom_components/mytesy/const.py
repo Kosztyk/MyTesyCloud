@@ -1,6 +1,6 @@
-"""Constants for the tesy integration."""
+"""Constants for the mytesy integration."""
 
-DOMAIN = "tesy"
+DOMAIN = "mytesy"
 
 CONF_USERNAME = "username"
 CONF_PASSWORD = "password"

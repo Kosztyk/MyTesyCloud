@@ -7,8 +7,8 @@ import types
 import unittest
 from datetime import datetime, timedelta, timezone
 
-ROOT = pathlib.Path(__file__).resolve().parents[1] / "custom_components" / "tesy"
-for name in ("homeassistant", "homeassistant.util", "tesy"):
+ROOT = pathlib.Path(__file__).resolve().parents[1] / "custom_components" / "mytesy"
+for name in ("homeassistant", "homeassistant.util", "mytesy"):
     package = types.ModuleType(name)
     package.__path__ = []
     sys.modules.setdefault(name, package)
@@ -17,12 +17,12 @@ dt.utcnow = lambda: datetime.now(timezone.utc)
 dt.as_local = lambda value: value.replace(tzinfo=timezone.utc)
 dt.as_utc = lambda value: value.astimezone(timezone.utc)
 sys.modules["homeassistant.util.dt"] = dt
-const = types.ModuleType("tesy.const")
+const = types.ModuleType("mytesy.const")
 const.TESY_STATE_STALE_MINUTES = 10
-sys.modules["tesy.const"] = const
-spec = importlib.util.spec_from_file_location("tesy.status", ROOT / "status.py")
+sys.modules["mytesy.const"] = const
+spec = importlib.util.spec_from_file_location("mytesy.status", ROOT / "status.py")
 status = importlib.util.module_from_spec(spec)
-sys.modules["tesy.status"] = status
+sys.modules["mytesy.status"] = status
 spec.loader.exec_module(status)
 
 

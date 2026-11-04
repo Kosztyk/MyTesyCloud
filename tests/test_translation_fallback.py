@@ -3,7 +3,7 @@ import json
 import unittest
 from pathlib import Path
 
-COMPONENT = Path(__file__).resolve().parents[1] / "custom_components" / "tesy"
+COMPONENT = Path(__file__).resolve().parents[1] / "custom_components" / "mytesy"
 
 class TranslationFallbackTests(unittest.TestCase):
     def test_english_matches_source(self):

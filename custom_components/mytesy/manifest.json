@@ -1,5 +1,5 @@
 {
-  "domain": "tesy",
+  "domain": "mytesy",
   "name": "MyTESY Cloud Convector",
   "codeowners": [
     "@Kosztyk"
@@ -17,5 +17,5 @@
   "requirements": [
     "paho-mqtt>=2.1.0"
   ],
-  "version": "1.1.5"
+  "version": "1.1.6"
 }

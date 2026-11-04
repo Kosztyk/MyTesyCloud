@@ -1,4 +1,4 @@
-"""The tesy integration."""
+"""The mytesy integration."""
 
 from __future__ import annotations
 
