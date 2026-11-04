@@ -1,0 +1,35 @@
+# Paste into a dashboard's Raw configuration editor; replace the entity IDs to match your system.
+title: TESY Cloud
+views:
+  - title: Overview
+    path: overview
+    icon: mdi:radiator
+    cards:
+      - type: thermostat
+        entity: climate.living
+      - type: history-graph
+        title: Room temperature history
+        hours_to_show: 168
+        entities:
+          - climate.living
+      - type: statistics-graph
+        title: Energy consumption
+        chart_type: line
+        period: day
+        days_to_show: 30
+        stat_types: [change]
+        entities:
+          - sensor.living_energy_estimated_2
+      - type: entities
+        title: TESY device groups
+        entities:
+          - sensor.tesy_cloud_device_groups
+  - title: Weekly schedules
+    path: schedules
+    icon: mdi:calendar-edit
+    cards:
+      - type: calendar
+        initial_view: dayGridWeek
+        entities:
+          - calendar.living_weekly_heating_program
+          - calendar.dormitor_weekly_heating_program

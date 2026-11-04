@@ -8,7 +8,7 @@
         "data": {
           "username": "E-mail",
           "password": "Password",
-          "user_id": "User ID"
+          "user_id": "User ID (optional; detected automatically)"
         }
       }
     },

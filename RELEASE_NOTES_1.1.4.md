@@ -1,15 +1,12 @@
-# MyTESY Cloud v1.1.4
+# MyTESY Cloud v1.1.4 — Climate heating-state fix
 
-Fixes a regression introduced after v1.0.0 where the Home Assistant thermostat card could unexpectedly show **Off** during a heating cycle when a TESY cloud update was stale.
+Fixes a regression where Home Assistant could show the TESY climate entity as Off during heating when the latest cloud status timestamp was stale. Climate HVAC mode now follows the reported device power status rather than using stale state as evidence of an off command.
 
-- A stale `updated_at` no longer forces the climate entity into Off.
-- The explicit TESY power `status` has priority over the `heating` activity flag.
-- Heating versus idle action remains distinct from Heat versus Off mode.
-- Adds targeted automated regression coverage.
-- Maintainer and affected user report successful device testing; compatibility claims remain limited to the devices actually tested.
+## Changes
+- Restore stable Heat/Off state display for devices with old cloud timestamps.
+- Report idle heater as Heat (idle), not Off, when TESY says the heater is powered on.
+- Respect explicitly reported device Off status even if the heating flag is contradictory.
+- Add regression tests for these states.
 
-Existing MQTT commands, authentication, controls, sensors and entities remain unchanged.
-
-## Validation
-
-HACS, Hassfest, repository packaging checks, Python unit tests, and compilation must complete successfully on the release commit. Device testing was reported separately by the maintainer and user.
+## Testing
+Code-level regression tests and packaging checks; live hardware verification remains pending.

@@ -1,12 +1,9 @@
 # MyTESY Cloud v1.1.5 — Energy statistics correction
 
-- Retain original rolling 30-day kWh estimate without incompatible `measurement` state class.
-- Add `Energy Total (estimated)` with `total_increasing` statistics and stable unique ID.
-- Persist cumulative estimated consumption across restarts.
-- Limit counted gaps between cloud observations to at most 120 seconds.
-- Reset-history service also resets cumulative estimated energy.
-- Add energy regression tests and Energy dashboard migration instructions.
+- Keep the original rolling 30-day kWh estimate, but remove its `measurement` state class because rolling windows can decrease.
+- Add `Energy Total (estimated)` with `total_increasing` statistics and a stable unique ID.
+- Persist cumulative estimated consumption in integration-managed Home Assistant storage, surviving restarts.
+- Integrate only short observed intervals (maximum 120 seconds) to avoid counting long outages as consumption.
+- Reset-history service also resets cumulative energy, which starts a new Home Assistant statistics cycle.
 
-**Upgrade action:** The old `*_energy_estimated` entities previously selected in Energy dashboard must be manually replaced with new `*_energy_total_estimated` entities. The integration cannot automatically update the Energy dashboard configuration.
-
-These are estimated values from heating status and reported wattage, not calibrated meter readings. Cumulative energy begins at zero on initial installation of v1.1.5.
+**Note:** Values are estimates based on the TESY heating flag and reported wattage, not measurements. The cumulative counter begins at zero on first use of v1.1.5; it cannot recover historical consumption that was not measured.

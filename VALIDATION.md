@@ -18,10 +18,6 @@ other TESY models, or other firmware versions. These corrections update
 documentation and config-flow wording; they do not change MQTT payloads,
 climate control methods, cloud authentication, or sensor calculations.
 
-## v1.1.4 field validation
-
-The maintainer and reporting user confirm successful operation of the v1.1.4 heating-state fix on their tested devices. The additional confirmation addresses the erroneous Heat-to-Off transition in the Home Assistant climate card. It does not imply universal testing across all TESY models or firmware versions. Existing CN06AS firmware 4.79 control testing remains documented above.
-
 ## Automated validation
 
 GitHub Actions runs HACS validation (without ignored checks), Home Assistant Hassfest, metadata checks and Python compilation.
@@ -48,7 +44,10 @@ diagnostic entity. The README now describes that behavior and the two rolling
 
 A 9 MB standalone `tesy.js` reference bundle was moved to `reference/tesy.js` because it is not imported by the integration's Python modules.
 
+## v1.1.6 legacy energy identity
 
-## v1.1.5 estimated energy validation
+Automated regression checks confirm the original energy unique ID, cumulative metadata, restore-state path and separate rolling sensor identity. Live-device and real-recorder upgrade verification is still required before publication.
 
-The rolling 30-day energy sensor no longer claims `measurement` state class. The new cumulative sensor is `total_increasing` (kWh) and uses persistent history storage. Regression tests cover cumulative integration, persistence, resets, and energy sensor metadata. The existing Home Assistant Energy dashboard device selections require manual migration to the new sensor; changing metadata cannot automatically change the dashboard source.
+## v1.2.11 domain conflict resolution
+
+This release's Home Assistant domain is `mytesy`; there is no `custom_components/tesy` integration directory. All production service calls use `mytesy`, and frontend assets/routes are namespaced to `mytesy`. HACS/Hassfest, package and unit validation run on this layout. Previous `tesy` installations must be manually re-added; the rename alone does not migrate Recorder energy statistics.

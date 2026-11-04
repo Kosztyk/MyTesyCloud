@@ -51,12 +51,18 @@ def stale_transition_time(state: dict[str, Any], now: datetime | None = None) ->
 
 
 def derived_power_on_raw(state: dict[str, Any]) -> bool:
-    """Resolve power from the explicit status; heating describes action, not mode."""
-    reported_status = state.get("status")
-    if isinstance(reported_status, bool):
-        return reported_status
-    if isinstance(reported_status, str) and reported_status.lower() in ("on", "off"):
-        return reported_status.lower() == "on"
+    """Return the reported device power mode, independently of heating activity.
+
+    TESY's ``status`` represents whether the convector is on. ``heating``
+    represents the heating element's current action and must not override
+    an explicitly reported off status. Only fall back to ``heating`` when
+    the device has not provided a recognizable ``status`` value.
+    """
+    status = state.get("status")
+    if isinstance(status, bool):
+        return status
+    if isinstance(status, str) and status.lower() in ("on", "off"):
+        return status.lower() == "on"
     return state_on(state.get("heating"))
 
 
@@ -72,12 +78,12 @@ def stale_active_state(state: dict[str, Any], now: datetime | None = None) -> bo
 
 
 def derived_power_on(state: dict[str, Any], now: datetime | None = None) -> bool:
-    """Stale cloud observations must not change the reported HVAC mode to Off."""
+    """Never interpret an old cloud timestamp as a power-off command."""
     return derived_power_on_raw(state)
 
 
 def heating_active(state: dict[str, Any], now: datetime | None = None) -> bool:
-    """Current heating action, separate from reported power state."""
+    """Return actual heating action, not the device power mode."""
     return derived_power_on_raw(state) and state_on(state.get("heating"))
 
 

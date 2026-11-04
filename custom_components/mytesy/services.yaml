@@ -1,10 +1,89 @@
 reset_history:
-  name: Reset TESY history
-  description: Reset locally tracked 30-day TESY power/heating history.
+  name: Reset TESY energy and runtime history
+  description: Reset integration-managed history for all devices or a specified MAC (destructive).
   fields:
     mac:
-      name: MAC
-      description: Optional device MAC address. Leave empty to reset all TESY devices for all configured TESY entries.
-      example: E0:E2:E6:8F:06:AC
+      name: Device MAC (optional)
       selector:
-        text: {}
+        text:
+set_program_interval:
+  name: Set TESY program interval (advanced)
+  description: Writes one weekly heating interval. Use a program number verified from your device/app; this action is not yet validated on physical hardware.
+  fields:
+    mac:
+      required: true
+      selector:
+        text:
+    day:
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 7
+          mode: box
+    from:
+      required: true
+      selector:
+        text:
+    to:
+      required: true
+      selector:
+        text:
+    temp:
+      required: true
+      selector:
+        number:
+          min: 5
+          max: 35
+          mode: box
+    program_number:
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 255
+          mode: box
+delete_program_interval:
+  name: Delete TESY program interval (advanced)
+  description: Deletes a single program number from a device; confirm the number in the mobile app first.
+  fields:
+    mac:
+      required: true
+      selector:
+        text:
+    program_number:
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 255
+          mode: box
+
+manage_group:
+  name: Manage TESY cloud group
+  description: Create/edit/delete groups or add a device using the Android app REST API.
+  fields:
+    operation:
+      required: true
+      selector:
+        select:
+          options: [create, edit, delete, add_device]
+    name:
+      selector:
+        text:
+    id:
+      selector:
+        number:
+          min: 1
+          max: 999999
+    group_id:
+      selector:
+        number:
+          min: 1
+          max: 999999
+    mac:
+      selector:
+        text:
+    devices:
+      selector:
+        object:

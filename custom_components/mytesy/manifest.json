@@ -1,14 +1,18 @@
 {
   "domain": "mytesy",
-  "name": "MyTESY Cloud Convector",
+  "name": "MyTESY Cloud",
   "codeowners": [
     "@Kosztyk"
   ],
   "config_flow": true,
   "dependencies": [
     "binary_sensor",
+    "calendar",
     "climate",
-    "sensor"
+    "number",
+    "sensor",
+    "switch",
+    "water_heater"
   ],
   "documentation": "https://github.com/Kosztyk/MyTesyCloud#readme",
   "integration_type": "hub",
@@ -17,5 +21,5 @@
   "requirements": [
     "paho-mqtt>=2.1.0"
   ],
-  "version": "1.1.6"
+  "version": "1.2.11"
 }

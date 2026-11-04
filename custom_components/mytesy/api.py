@@ -47,7 +47,7 @@ class _TesyMqttPublisher:
 
         client = mqtt.Client(
             callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
-            client_id=f"ha_tesy_{self._app_id[:16]}",
+            client_id=f"ha_mytesy_{self._app_id[:16]}",
             transport="websockets",
             protocol=mqtt.MQTTv311,
         )
@@ -123,7 +123,28 @@ class TesyCloudApi:
         self._user_id = user_id
         self._mqtt = _TesyMqttPublisher(app_id=app_id)
 
+    async def async_resolve_user_id(self) -> str:
+        """Log in like the Android MyTESY app and resolve userID automatically."""
+        if self._user_id:
+            return self._user_id
+        headers = {"Origin": TESY_ORIGIN, "Referer": f"{TESY_ORIGIN}/", "Accept": "application/json"}
+        try:
+            async with self._session.post(
+                f"{TESY_API_BASE}/app-user-login",
+                json={"email": self._username, "password": self._password},
+                headers=headers, timeout=aiohttp.ClientTimeout(total=20),
+            ) as response:
+                response.raise_for_status()
+                data = await response.json(content_type=None)
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as err:
+            raise TesyCloudAuthError("Could not authenticate using MyTESY account") from err
+        if not isinstance(data, dict) or data.get("errors") or not data.get("userID"):
+            raise TesyCloudAuthError("MyTESY did not return a user ID; verify email and password")
+        self._user_id = str(data["userID"])
+        return self._user_id
+
     async def async_get_my_devices(self) -> dict[str, Any]:
+        await self.async_resolve_user_id()
         url = f"{TESY_API_BASE}/get-my-devices"
         params = {
             "userID": self._user_id,
@@ -155,6 +176,55 @@ class TesyCloudApi:
             raise TesyCloudError(f"Unexpected response type: {type(data)}")
 
         return data
+
+    async def async_get_device_statistics(self, device: dict[str, Any], kind: str, activity: str = "daily") -> Any:
+        """Read TESY-app native statistics; never mutate device or energy history."""
+        endpoints = {"power": "get-device-power-stat", "temperature": "get-device-temp-stat", "state": "get-device-state-stat"}
+        if kind not in endpoints or activity not in {"daily", "weekly", "monthly"}:
+            raise ValueError("Unsupported statistics query")
+        mac = device.get("mac") or (device.get("state") or {}).get("mac")
+        if not mac or device.get("model_id") is None:
+            raise TesyCloudError("Missing device MAC or model_id for statistics")
+        params = {"userID": self._user_id, "userEmail": self._username, "userPass": self._password,
+                  "lang": TESY_LANG, "mac": mac, "model": device["model_id"],
+                  "timezone": device.get("timezone") or "UTC", "activity": activity}
+        headers = {"Origin": TESY_ORIGIN, "Referer": f"{TESY_ORIGIN}/", "Accept": "application/json"}
+        try:
+            async with self._session.get(f"{TESY_API_BASE}/{endpoints[kind]}", params=params, headers=headers,
+                                         timeout=aiohttp.ClientTimeout(total=20)) as response:
+                response.raise_for_status()
+                result = await response.json(content_type=None)
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
+            raise TesyCloudError(f"Statistics request failed ({kind}): {type(exc).__name__}") from exc
+        if isinstance(result, dict) and str(result.get("error", "0")) == "1":
+            raise TesyCloudError("TESY statistics endpoint returned an error")
+        return result.get("data", result) if isinstance(result, dict) else result
+
+    async def async_group_request(self, endpoint: str, *, payload: dict[str, Any] | None = None) -> Any:
+        """Use the group REST operations seen in the official Android application."""
+        allowed = {"get-my-groups", "create-group", "edit-group", "delete-group", "add-device-to-group"}
+        if endpoint not in allowed:
+            raise ValueError("Unsupported TESY group action")
+        credentials = {"userID": self._user_id, "userEmail": self._username,
+                       "userPass": self._password, "lang": TESY_LANG}
+        headers = {"Origin": TESY_ORIGIN, "Referer": f"{TESY_ORIGIN}/", "Accept": "application/json"}
+        try:
+            url = f"{TESY_API_BASE}/{endpoint}"
+            if endpoint == "get-my-groups":
+                async with self._session.get(url, params=credentials, headers=headers,
+                                             timeout=aiohttp.ClientTimeout(total=20)) as response:
+                    response.raise_for_status()
+                    result = await response.json(content_type=None)
+            else:
+                async with self._session.post(url, json={**credentials, **(payload or {})}, headers=headers,
+                                              timeout=aiohttp.ClientTimeout(total=20)) as response:
+                    response.raise_for_status()
+                    result = await response.json(content_type=None)
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
+            raise TesyCloudError(f"Group request failed ({endpoint}): {type(exc).__name__}") from exc
+        if isinstance(result, dict) and (str(result.get("error", "0")) == "1" or result.get("success") is False):
+            raise TesyCloudError(f"TESY group operation rejected: {endpoint}")
+        return result
 
     async def async_send_command(
         self,

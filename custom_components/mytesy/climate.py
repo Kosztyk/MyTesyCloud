@@ -16,6 +16,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .api import TesyCloudError
 from .const import DOMAIN
+from .device_families import supports_water_heater
 from .coordinator import TesyCloudCoordinator
 from .status import cloud_connected, derived_power_on, heating_active, stale_active_state
 
@@ -55,7 +56,7 @@ def _hvac_action(state: dict[str, Any]) -> HVACAction:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     coordinator: TesyCloudCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
-    entities = [TesyCloudClimate(coordinator, mac) for mac in (coordinator.data or {}).keys()]
+    entities = [TesyCloudClimate(coordinator, mac) for mac, row in (coordinator.data or {}).items() if not supports_water_heater(row.get("device") or {})]
     async_add_entities(entities)
 
 

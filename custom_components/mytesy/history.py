@@ -252,14 +252,17 @@ class TesyHistoryManager:
                 if heating_on:
                     status_on = True
 
-            # Cumulative estimate from observed intervals; limit prolonged gaps.
+            # Integrate only observed polling intervals. Persist the previous
+            # heating state and wattage so a restart never fabricates energy.
             energy = self._energy.setdefault(mac, {
                 "kwh": 0.0, "last_sample": None,
                 "last_heating": False, "last_watts": 0.0,
             })
             previous_sample = _parse_iso_utc(energy.get("last_sample"))
             if previous_sample is not None and energy.get("last_heating"):
-                elapsed = min(max(0.0, (now - previous_sample).total_seconds()), 120.0)
+                elapsed = max(0.0, (now - previous_sample).total_seconds())
+                # Never count multi-hour outages as continuously heating.
+                elapsed = min(elapsed, 120.0)
                 addition = elapsed * float(energy.get("last_watts", 0.0)) / 3_600_000.0
                 if addition > 0:
                     energy["kwh"] += addition
