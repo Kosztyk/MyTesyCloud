@@ -33,7 +33,7 @@ The maintainer confirms that all available **convector** write operations and we
 | Comfort, Eco and correction settings | `setComfortTemp`, `setEcoTemp`, `setTCorrection` | Maintainer-reported CN06AS test |
 | Weekly schedule add, modify, delete | `setProgram`, `deleteProgram` | Maintainer-reported CN06AS test |
 
-All existing device controls remain enabled. The hardware details above are the maintainer's confirmation; automated tests additionally cover API/flow structure and service handling, not physical devices. The integration also exposes model-specific B15, E32 and HPWH4_11 water-heater commands (`powerOnOff`, `setStandby`, and `setMode`); those **cannot be physically validated using a CN06AS convector**, and no separate water-heater model/firmware test details have been supplied. These controls remain enabled as requested, but reviewers may require model-specific hardware confirmation.
+All existing device controls remain enabled. The hardware details above are the maintainer's confirmation; automated tests additionally cover API/flow structure and service handling, not physical devices. 
 
 See [VALIDATION.md](VALIDATION.md) for the scope of hardware tests and the regression suite.
 
