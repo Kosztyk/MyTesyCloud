@@ -11,8 +11,7 @@ A dedicated switch on every convector device controls only whether **TESY schedu
 > [!IMPORTANT]
 > **Existing manual installations must remove and re-add MyTESY Cloud.** The integration domain changed from `tesy` to `mytesy`. Home Assistant cannot upgrade the old `tesy` configuration entry in place. **Back up Home Assistant before migrating**, install this integration in `/config/custom_components/mytesy/`, then add **MyTESY Cloud** again under **Settings → Devices & services**. Existing entity IDs, automations and Energy dashboard/statistics references may require manual updates. See [Migration from the old domain](#migration-from-the-old-domain) for the complete steps.
 
-Unofficial Home Assistant custom integration for TESY MyTESY cloud appliances, primarily **convectors**, using the MyTESY **v4** cloud endpoint. Additional water-heater and heat-pump support is model-dependent and requires real-device validation.
-
+Unofficial Home Assistant custom integration for TESY MyTESY cloud appliances, primarily **convectors**, using the MyTESY **v4** cloud endpoint. 
 This integration uses **cloud polling** for status and MQTT-over-WebSocket for power, temperature and preset commands. Sensors and binary sensors are read-only.
 
 ## Tested hardware
