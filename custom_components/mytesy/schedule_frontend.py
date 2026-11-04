@@ -6,9 +6,9 @@ from homeassistant.helpers.storage import Store
 from .const import DOMAIN
 
 PANEL_PATH = "mytesy-schedules"
-PANEL_NAME = "mytesy-schedule-panel-1-2-11"
-EDITOR_ASSET = "/mytesy/schedule-editor-1.2.11.js"
-ENTITY_ASSET = "/mytesy/schedule-entity-1.2.11.js"
+PANEL_NAME = "mytesy-schedule-panel-1-2-12"
+EDITOR_ASSET = "/mytesy/schedule-editor-1.2.12.js"
+ENTITY_ASSET = "/mytesy/schedule-entity-1.2.12.js"
 
 async def async_sidebar_state(hass):
     state = hass.data.setdefault(DOMAIN, {}).setdefault("_editor", {})
@@ -40,10 +40,12 @@ async def async_setup_editor(hass):
     if state.get("ready"):
         return
     base = Path(__file__).parent / "www"
-    await hass.http.async_register_static_paths([
-        StaticPathConfig(EDITOR_ASSET, str(base / "schedule-editor.js"), False),
-        StaticPathConfig(ENTITY_ASSET, str(base / "schedule-entity.js"), False),
-    ])
+    if not state.get("static_paths_registered"):
+        await hass.http.async_register_static_paths([
+            StaticPathConfig(EDITOR_ASSET, str(base / "schedule-editor.js"), False),
+            StaticPathConfig(ENTITY_ASSET, str(base / "schedule-entity.js"), False),
+        ])
+        state["static_paths_registered"] = True
     frontend.add_extra_js_url(hass, ENTITY_ASSET)
     _register_panel(hass, state)
     state["ready"] = True

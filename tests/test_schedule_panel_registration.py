@@ -11,7 +11,7 @@ class TestSchedulePanelRegistration(unittest.TestCase):
         js = (ROOT / "www/schedule-editor.js").read_text()
         panel = re.search(r'PANEL_NAME\s*=\s*"([^"]+)"', py).group(1)
         self.assertIn(f"customElements.define('{panel}'", js)
-        self.assertIn("schedule-editor-1.2.11.js", py)
-        self.assertIn('"version": "1.2.11"', (ROOT / "manifest.json").read_text())
+        self.assertIn("schedule-editor-1.2.12.js", py)
+        self.assertIn('"version": "1.2.12"', (ROOT / "manifest.json").read_text())
 
 if __name__ == "__main__": unittest.main()

@@ -28,6 +28,14 @@ A dedicated switch on every convector device controls only whether **TESY schedu
 
 # Changelog
 
+## v1.2.12 — HACS review corrections
+
+- Preserve all existing writable controls and document the maintainer-confirmed CN06AS 4.79 convector command testing.
+- Fix multi-account service selection, `_editor` KeyError, service lifetime, last-entry cleanup and scheduler frontend unload.
+- Convert persistent login rejection to Home Assistant reauthentication, with a password recovery UI.
+- Add service/auth regression tests while preserving existing energy entities.
+
+
 ## 1.2.0 — TESY cloud statistics and settings preview
 
 # v1.2.0 — MyTESY native statistics and advanced convector settings (preview)

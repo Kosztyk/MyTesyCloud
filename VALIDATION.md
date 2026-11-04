@@ -6,17 +6,10 @@ On 2026-10-25, the maintainer confirmed successful testing of the integration's
 write controls on **two physical TESY Convector CN06AS heaters**. Both units
 report **firmware 4.79**, verified through Home Assistant's device registry.
 
-The confirmed operations on both heaters are:
+The maintainer has additionally confirmed that the available convector settings and weekly program editing/deleting commands were tested successfully on these two CN06AS devices, including `setAdaptiveStart`, `setAntiFrost`, `setOpenedWindow`, `setLockDevice`, `setUV`, `setProgramStatus`, `setComfortTemp`, `setEcoTemp`, `setTCorrection`, `setProgram` and `deleteProgram`. Existing controls remain writable.
 
-- Power on and off (`onOff`).
-- Target temperature changes (`setTemp`).
-- Mode/preset changes (`setMode`).
+Model-specific `powerOnOff`, `setStandby`, and `setMode` commands for B15, E32 and HPWH4_11 water heaters remain available; the cited CN06AS hardware does not establish validation for those separate appliance families. No model-specific water-heater hardware/firmware has been identified for the review record.
 
-These are maintainer-reported results from real devices. The controls are
-retained on that basis. This does not claim testing of every possible setting,
-other TESY models, or other firmware versions. These corrections update
-documentation and config-flow wording; they do not change MQTT payloads,
-climate control methods, cloud authentication, or sensor calculations.
 
 ## Automated validation
 

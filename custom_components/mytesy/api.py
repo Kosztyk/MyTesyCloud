@@ -134,10 +134,16 @@ class TesyCloudApi:
                 json={"email": self._username, "password": self._password},
                 headers=headers, timeout=aiohttp.ClientTimeout(total=20),
             ) as response:
+                if response.status in (401, 403):
+                    raise TesyCloudAuthError("MyTESY rejected credentials")
                 response.raise_for_status()
                 data = await response.json(content_type=None)
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as err:
-            raise TesyCloudAuthError("Could not authenticate using MyTESY account") from err
+        except TesyCloudAuthError:
+            raise
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            raise TesyCloudError("Cannot reach MyTESY authentication service") from err
+        except ValueError as err:
+            raise TesyCloudError("Invalid MyTESY authentication response") from err
         if not isinstance(data, dict) or data.get("errors") or not data.get("userID"):
             raise TesyCloudAuthError("MyTESY did not return a user ID; verify email and password")
         self._user_id = str(data["userID"])
@@ -160,6 +166,9 @@ class TesyCloudApi:
 
         try:
             async with self._session.get(url, params=params, headers=headers, timeout=aiohttp.ClientTimeout(total=20)) as resp:
+                if resp.status in (401, 403):
+                    raise TesyCloudAuthError("MyTESY rejected credentials")
+                resp.raise_for_status()
                 text = await resp.text()
                 try:
                     data = await resp.json(content_type=None)
@@ -169,7 +178,7 @@ class TesyCloudApi:
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             raise TesyCloudError(f"Connection error: {e}") from e
 
-        if isinstance(data, dict) and data.get("error") == "1":
+        if isinstance(data, dict) and str(data.get("error", "")) == "1":
             raise TesyCloudAuthError("MyTESY rejected credentials (error=1).")
 
         if not isinstance(data, dict):

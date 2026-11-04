@@ -9,6 +9,7 @@ import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
@@ -23,7 +24,155 @@ SERVICE_RESET_HISTORY = "reset_history"
 LOGGER = logging.getLogger(__name__)
 
 
+def _entry_records(hass: HomeAssistant) -> dict[str, dict]:
+    """Return only currently loaded MyTESY accounts, excluding UI state."""
+    state = hass.data.get(DOMAIN, {})
+    records = {}
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        record = state.get(entry.entry_id)
+        if isinstance(record, dict) and "coordinator" in record and "api" in record:
+            records[entry.entry_id] = record
+    return records
+
+
+def _resolve_record(hass: HomeAssistant, entry_id: str | None = None) -> dict:
+    """Resolve a live account per invocation; never capture the first account."""
+    records = _entry_records(hass)
+    if entry_id:
+        record = records.get(entry_id)
+        if record is None:
+            raise HomeAssistantError("The specified MyTESY account is not loaded")
+        return record
+    if not records:
+        raise HomeAssistantError("No MyTESY account is loaded")
+    if len(records) != 1:
+        raise HomeAssistantError("Select entry_id when multiple MyTESY accounts are loaded")
+    return next(iter(records.values()))
+
+
+def _resolve_device(hass: HomeAssistant, mac: str, entry_id: str | None = None):
+    """Resolve a heater in the correct account without indexing `_editor`."""
+    records = _entry_records(hass)
+    if entry_id:
+        record = _resolve_record(hass, entry_id)
+        payload = (record["coordinator"].data or {}).get(mac)
+        if payload is None:
+            raise HomeAssistantError("Device MAC not found in the specified MyTESY account")
+        return record, payload
+    matches = [
+        (record, payload)
+        for record in records.values()
+        if (payload := (record["coordinator"].data or {}).get(mac)) is not None
+    ]
+    if not matches:
+        raise HomeAssistantError("MyTESY device MAC not found in any loaded account")
+    if len(matches) > 1:
+        raise HomeAssistantError("Device MAC belongs to multiple accounts; specify entry_id")
+    return matches[0]
+
+
+def _register_services(hass: HomeAssistant) -> None:
+    """Global services resolve loaded entries afresh for every service call."""
+    if not hass.services.has_service(DOMAIN, SERVICE_RESET_HISTORY):
+        async def _reset_history(call: ServiceCall) -> None:
+            records = _entry_records(hass)
+            selected = call.data.get("entry_id")
+            if selected:
+                records = {selected: _resolve_record(hass, selected)}
+            if not records:
+                raise HomeAssistantError("No MyTESY account is loaded")
+            for record in records.values():
+                history = record.get("history")
+                if history is not None:
+                    await history.async_reset(call.data.get("mac"))
+                await record["coordinator"].async_request_refresh()
+
+        hass.services.async_register(
+            DOMAIN, SERVICE_RESET_HISTORY, _reset_history,
+            schema=vol.Schema({vol.Optional("mac"): cv.string,
+                               vol.Optional("entry_id"): cv.string}),
+        )
+
+    if not hass.services.has_service(DOMAIN, "set_program_interval"):
+        async def _set_program_interval(call: ServiceCall) -> None:
+            record, payload = _resolve_device(hass, call.data["mac"], call.data.get("entry_id"))
+            await record["api"].async_send_command(payload["device"], "setProgram", {
+                "day": call.data["day"], "from": call.data["from"],
+                "to": call.data["to"], "temp": call.data["temp"],
+                "program_number": call.data["program_number"],
+            })
+            await record["coordinator"].async_request_refresh()
+
+        hass.services.async_register(
+            DOMAIN, "set_program_interval", _set_program_interval,
+            schema=vol.Schema({
+                vol.Required("mac"): cv.string,
+                vol.Optional("entry_id"): cv.string,
+                vol.Required("day"): vol.All(vol.Coerce(int), vol.Range(min=0, max=7)),
+                vol.Required("from"): vol.Match(r"^([01]\d|2[0-3]):[0-5]\d$"),
+                vol.Required("to"): vol.Match(r"^([01]\d|2[0-3]):[0-5]\d$"),
+                vol.Required("temp"): vol.All(vol.Coerce(int), vol.Range(min=5, max=35)),
+                vol.Required("program_number"): vol.All(vol.Coerce(int), vol.Range(min=1, max=255)),
+            }),
+        )
+
+    if not hass.services.has_service(DOMAIN, "delete_program_interval"):
+        async def _delete_program_interval(call: ServiceCall) -> None:
+            record, payload = _resolve_device(hass, call.data["mac"], call.data.get("entry_id"))
+            await record["api"].async_send_command(payload["device"], "deleteProgram", {
+                "program_number": call.data["program_number"],
+            })
+            await record["coordinator"].async_request_refresh()
+
+        hass.services.async_register(
+            DOMAIN, "delete_program_interval", _delete_program_interval,
+            schema=vol.Schema({
+                vol.Required("mac"): cv.string,
+                vol.Optional("entry_id"): cv.string,
+                vol.Required("program_number"): vol.All(vol.Coerce(int), vol.Range(min=1, max=255)),
+            }),
+        )
+
+    if not hass.services.has_service(DOMAIN, "manage_group"):
+        async def _group_action(call: ServiceCall) -> None:
+            action = call.data["operation"]
+            endpoint = {"create": "create-group", "edit": "edit-group",
+                        "delete": "delete-group", "add_device": "add-device-to-group"}[action]
+            params = {k: v for k, v in call.data.items() if k not in {"operation", "entry_id"}}
+            if action in {"edit", "delete"} and "id" not in params:
+                raise HomeAssistantError("Group id is required")
+            if action == "add_device" and ("group_id" not in params or "mac" not in params):
+                raise HomeAssistantError("Group id and device MAC are required")
+            if action == "create" and not str(params.get("name") or "").strip():
+                raise HomeAssistantError("Group name is required")
+            record = _resolve_record(hass, call.data.get("entry_id"))
+            await record["api"].async_group_request(endpoint, payload=params)
+            await record["coordinator"].async_request_refresh()
+
+        hass.services.async_register(
+            DOMAIN, "manage_group", _group_action,
+            schema=vol.Schema({
+                vol.Required("operation"): vol.In(["create", "edit", "delete", "add_device"]),
+                vol.Optional("entry_id"): cv.string,
+                vol.Optional("id"): vol.Coerce(int),
+                vol.Optional("group_id"): vol.Coerce(int),
+                vol.Optional("name"): cv.string,
+                vol.Optional("mac"): cv.string,
+                vol.Optional("devices"): [cv.string],
+            }),
+        )
+
+
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    """Register integration-wide services once, independent of accounts."""
+    hass.data.setdefault(DOMAIN, {})
+    _register_services(hass)
+    return True
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    # Restore global services if HA reloads a fully unloaded integration.
+    _register_services(hass)
     session = async_get_clientsession(hass)
     username = entry.data[CONF_USERNAME]
     password = entry.data[CONF_PASSWORD]
@@ -54,85 +203,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "history": history,
     }
 
-    if not hass.services.has_service(DOMAIN, SERVICE_RESET_HISTORY):
-        async def _async_handle_reset_history(call: ServiceCall) -> None:
-            mac = call.data.get("mac")
-            for item in hass.data.get(DOMAIN, {}).values():
-                hist = item.get("history")
-                coord = item.get("coordinator")
-                if hist is None:
-                    continue
-                await hist.async_reset(mac)
-                if coord is not None:
-                    await coord.async_request_refresh()
-
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_RESET_HISTORY,
-            _async_handle_reset_history,
-            schema=vol.Schema({vol.Optional("mac"): cv.string}),
-        )
-
-    if not hass.services.has_service(DOMAIN, "set_program_interval"):
-        async def _set_program_interval(call: ServiceCall) -> None:
-            mac = call.data["mac"]
-            for record in hass.data.get(DOMAIN, {}).values():
-                payload = (record["coordinator"].data or {}).get(mac)
-                if payload is not None:
-                    await record["api"].async_send_command(payload["device"], "setProgram", {
-                        "day": call.data["day"], "from": call.data["from"],
-                        "to": call.data["to"], "temp": call.data["temp"],
-                        "program_number": call.data["program_number"],
-                    })
-                    await record["coordinator"].async_request_refresh()
-                    return
-            raise ValueError("Specified TESY MAC not found")
-        hass.services.async_register(DOMAIN, "set_program_interval", _set_program_interval,
-            schema=vol.Schema({vol.Required("mac"): cv.string,
-                vol.Required("day"): vol.All(vol.Coerce(int), vol.Range(min=0, max=7)),
-                vol.Required("from"): vol.Match(r"^([01]\d|2[0-3]):[0-5]\d$"),
-                vol.Required("to"): vol.Match(r"^([01]\d|2[0-3]):[0-5]\d$"),
-                vol.Required("temp"): vol.All(vol.Coerce(int), vol.Range(min=5, max=35)),
-                vol.Required("program_number"): vol.All(vol.Coerce(int), vol.Range(min=1, max=255))}))
-
-    if not hass.services.has_service(DOMAIN, "delete_program_interval"):
-        async def _delete_program_interval(call: ServiceCall) -> None:
-            for record in hass.data.get(DOMAIN, {}).values():
-                payload = (record["coordinator"].data or {}).get(call.data["mac"])
-                if payload is not None:
-                    await record["api"].async_send_command(payload["device"], "deleteProgram", {
-                        "program_number": call.data["program_number"]})
-                    await record["coordinator"].async_request_refresh()
-                    return
-            raise ValueError("Specified TESY MAC not found")
-        hass.services.async_register(DOMAIN, "delete_program_interval", _delete_program_interval,
-            schema=vol.Schema({vol.Required("mac"): cv.string,
-                vol.Required("program_number"): vol.All(vol.Coerce(int), vol.Range(min=1, max=255))}))
-
-    # Group operations use TESY native group REST API, not local synthetic groups.
-    async def _group_action(call: ServiceCall) -> None:
-        action = call.data["operation"]
-        endpoint = {"create": "create-group", "edit": "edit-group", "delete": "delete-group",
-                    "add_device": "add-device-to-group"}[action]
-        params = {k: v for k,v in call.data.items() if k not in {"operation", "entry_id"}}
-        if action in {"edit", "delete"} and "id" not in params:
-            raise ValueError("Group id required")
-        if action == "add_device" and ("group_id" not in params or "mac" not in params):
-            raise ValueError("Group id and device MAC required")
-        if action == "create" and not str(params.get("name") or "").strip():
-            raise ValueError("Group name required")
-        record = hass.data[DOMAIN].get(call.data.get("entry_id") or entry.entry_id)
-        if record is None: raise ValueError("TESY integration entry unavailable")
-        await record["api"].async_group_request(endpoint, payload=params)
-        await record["coordinator"].async_request_refresh()
-
-    if not hass.services.has_service(DOMAIN, "manage_group"):
-        hass.services.async_register(DOMAIN, "manage_group", _group_action, schema=vol.Schema({
-            vol.Required("operation"): vol.In(["create", "edit", "delete", "add_device"]),
-            vol.Optional("entry_id"): cv.string, vol.Optional("id"): vol.Coerce(int),
-            vol.Optional("group_id"): vol.Coerce(int), vol.Optional("name"): cv.string,
-            vol.Optional("mac"): cv.string, vol.Optional("devices"): [cv.string]}))
-
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     try:
         from .schedule_frontend import async_setup_editor
@@ -143,9 +213,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    if unload_ok:
-        hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
-        if not hass.data.get(DOMAIN) and hass.services.has_service(DOMAIN, SERVICE_RESET_HISTORY):
-            hass.services.async_remove(DOMAIN, SERVICE_RESET_HISTORY)
-    return unload_ok
+    """Unload this account; on the last account clean up services and editor."""
+    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if not unloaded:
+        return False
+
+    hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
+    if not _entry_records(hass):
+        from .schedule_frontend import async_unload_editor
+        try:
+            await async_unload_editor(hass)
+        finally:
+            for service in (SERVICE_RESET_HISTORY, "set_program_interval",
+                            "delete_program_interval", "manage_group"):
+                if hass.services.has_service(DOMAIN, service):
+                    hass.services.async_remove(DOMAIN, service)
+            # Retain static URL registration across entry reloads.
+    return True

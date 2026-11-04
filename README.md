@@ -1,4 +1,4 @@
-## v1.2.11 — TESY schedules, cloud features and unique `mytesy` domain
+## v1.2.12 — HACS review fixes, schedules, cloud features and unique `mytesy` domain
 
 A dedicated switch on every convector device controls only whether **TESY schedules** is shown in Home Assistant’s left navigation. It does not modify the heater weekly program. Sidebar visibility is saved and survives Home Assistant restarts. The mistaken schedule on/off switch inside the editor has been removed. Existing entities and energy sensor unique IDs are unchanged.
 
@@ -9,28 +9,33 @@ A dedicated switch on every convector device controls only whether **TESY schedu
 # MyTESY Cloud Convector (Home Assistant)
 
 > [!IMPORTANT]
-> **Existing manual installations must remove and re-add MyTESY Cloud.** The integration domain changed from `tesy` to `mytesy`. Home Assistant cannot upgrade the old `tesy` configuration entry in place. **Back up Home Assistant before migrating**, install this integration in `/config/custom_components/mytesy/`, then add **MyTESY Cloud** again under **Settings → Devices & services**. Existing entity IDs, automations and Energy dashboard/statistics references may require manual updates. See [Migration from the old domain](#migration-from-the-old-domain) for the complete steps.
+> **Existing manual installations must remove and re-add MyTESY Cloud.** The Home Assistant integration domain changed from `tesy` to `mytesy`. Back up Home Assistant, install under `/config/custom_components/mytesy/`, then remove the old cloud integration entry and add **MyTESY Cloud** again. Entity IDs, energy statistics and automations may require manual updates. See the [migration steps](#installation).
 
-Unofficial Home Assistant custom integration for TESY MyTESY cloud appliances, primarily **convectors**, using the MyTESY **v4** cloud endpoint. 
+Unofficial Home Assistant custom integration for TESY MyTESY cloud appliances, primarily **convectors**, using the MyTESY **v4** cloud endpoint. Additional water-heater and heat-pump support is model-dependent and requires real-device validation.
+
 This integration uses **cloud polling** for status and MQTT-over-WebSocket for power, temperature and preset commands. Sensors and binary sensors are read-only.
 
 ## Tested hardware
 
-The maintainer has successfully tested the integration's write controls on
-**two physical TESY Convector CN06AS heaters**. Both devices report
-**firmware 4.79** in Home Assistant.
+The maintainer confirms that all available **convector** write operations and weekly schedule editing were exercised successfully on **two physical TESY Convector CN06AS heaters, firmware 4.79**. The maintained command set includes:
 
-| Control tested on both heaters | MQTT command | Result |
+| Convector feature | Cloud command | Confirmation |
 | --- | --- | --- |
-| Power on/off | `onOff` | Successful on real hardware |
-| Target temperature changes | `setTemp` | Successful on real hardware |
-| Mode/preset changes | `setMode` | Successful on real hardware |
+| Power on/off | `onOff` | Maintainer-reported CN06AS test |
+| Target temperature | `setTemp` | Maintainer-reported CN06AS test |
+| Mode and presets | `setMode` | Maintainer-reported CN06AS test |
+| Adaptive Start | `setAdaptiveStart` | Maintainer-reported CN06AS test |
+| Anti-Frost | `setAntiFrost` | Maintainer-reported CN06AS test |
+| Open Window Detection | `setOpenedWindow` | Maintainer-reported CN06AS test |
+| Child Lock | `setLockDevice` | Maintainer-reported CN06AS test |
+| UV | `setUV` | Maintainer-reported CN06AS test |
+| Weekly Program enable/disable | `setProgramStatus` | Maintainer-reported CN06AS test |
+| Comfort, Eco and correction settings | `setComfortTemp`, `setEcoTemp`, `setTCorrection` | Maintainer-reported CN06AS test |
+| Weekly schedule add, modify, delete | `setProgram`, `deleteProgram` | Maintainer-reported CN06AS test |
 
-This confirmation was provided by the maintainer on 2026-10-25; the firmware
-versions were checked in the Home Assistant device registry. It applies to
-these two CN06AS units and does not establish compatibility with every TESY
-model or firmware. See [VALIDATION.md](VALIDATION.md) for the separate scope
-of hardware testing and automated checks.
+All existing device controls remain enabled. The hardware details above are the maintainer's confirmation; automated tests additionally cover API/flow structure and service handling, not physical devices. The integration also exposes model-specific B15, E32 and HPWH4_11 water-heater commands (`powerOnOff`, `setStandby`, and `setMode`); those **cannot be physically validated using a CN06AS convector**, and no separate water-heater model/firmware test details have been supplied. These controls remain enabled as requested, but reviewers may require model-specific hardware confirmation.
+
+See [VALIDATION.md](VALIDATION.md) for the scope of hardware tests and the regression suite.
 
 ## Features
 
@@ -103,7 +108,7 @@ After the catalog submission is accepted, the custom-repository step will not be
 
 2. Restart Home Assistant.
 
-### Migration from the old domain
+**Important: migration from the previous `tesy` integration domain.**
 
 This release uses the unique Home Assistant domain **`mytesy`**, avoiding a collision with the separate local TESY integration [`krasnoukhov/homeassistant-tesy`](https://github.com/krasnoukhov/homeassistant-tesy). Because Home Assistant identifies integrations by domain, upgrading an old `tesy` configuration entry in place **is not supported**. Follow these steps:
 
@@ -186,7 +191,7 @@ HACS, Hassfest and packaging checks are run by GitHub Actions. These do not test
 [MIT License](LICENSE.txt); [original Romanian translation](docs/licenta-originala-ro.md).
 
 
-## Scheduler, settings and appliance support in v1.2.11
+## Scheduler, settings and appliance support in v1.2.12
 
 - A **TESY schedules** custom panel is available at `/mytesy-schedules`, accessible using a Schedule editor sensor or the administrator sidebar. Its visibility is controlled by the **Show TESY schedules in sidebar** switch on a TESY convector; this affects navigation only, never heater programming.
 - Weekly Program is a separate device setting. When TESY returns `programStatus: null`, the switch is **Unavailable** and the schedule panel reports **Status unavailable**. The panel does not treat missing program data as an empty schedule and disables editing until program data is reported.

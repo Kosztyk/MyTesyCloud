@@ -10,6 +10,13 @@
           "password": "Password",
           "user_id": "User ID (optional; detected automatically)"
         }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate MyTESY Cloud",
+        "description": "Your MyTESY account password is no longer accepted. Enter your current password to reconnect.",
+        "data": {
+          "password": "Password"
+        }
       }
     },
     "error": {

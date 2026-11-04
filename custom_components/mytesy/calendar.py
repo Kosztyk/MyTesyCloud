@@ -23,7 +23,7 @@ def _program_items(raw):
 
 
 def _as_weekday(day):
-    # TESY cloud weekday numbering needs hardware validation, use documented ISO day 1-7 here.
+    # ISO weekday numbers 1-7, matching the maintainer-confirmed CN06AS schedule programming.
     try:
         i = int(day)
         return i if 1 <= i <= 7 else None

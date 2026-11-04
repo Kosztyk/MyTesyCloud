@@ -7,9 +7,10 @@ from datetime import timedelta
 from typing import Any
 
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import TesyCloudApi, TesyCloudError
+from .api import TesyCloudApi, TesyCloudError, TesyCloudAuthError
 from .history import TesyHistoryManager
 from .const import DOMAIN
 
@@ -66,5 +67,7 @@ class TesyCloudCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             return out
 
+        except TesyCloudAuthError as err:
+            raise ConfigEntryAuthFailed("MyTESY credentials were rejected. Please reauthenticate.") from err
         except TesyCloudError as err:
             raise UpdateFailed(str(err)) from err
