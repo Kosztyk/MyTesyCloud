@@ -44,4 +44,4 @@ class TesySchedulePanel extends HTMLElement {
   }
   async call(service,data){this._busy=true;this._message='Sending change to TESY…';this.draw();try{await this._hass.callService('mytesy',service,data);this._message='Command sent. Waiting for cloud state to reflect the change.';this._editing=null;}catch(e){this._message='TESY rejected change: '+String(e.message||e);}finally{this._busy=false;this.draw();}}
 }
-if (!customElements.get('mytesy-schedule-panel-1-2-12')) customElements.define('mytesy-schedule-panel-1-2-12',TesySchedulePanel);
+if (!customElements.get('mytesy-schedule-panel-1-2-13')) customElements.define('mytesy-schedule-panel-1-2-13',TesySchedulePanel);

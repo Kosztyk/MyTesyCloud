@@ -22,7 +22,7 @@ class TestUniqueDomain(unittest.TestCase):
     def test_release_workflow_targets_new_domain(self):
         release=(ROOT/'.github/workflows/release.yml').read_text()
         self.assertIn('custom_components/mytesy/manifest.json', release)
-        self.assertIn('1.2.12', release)
+        self.assertIn('1.2.13', release)
         self.assertNotIn('custom_components/tesy/', release)
 
 if __name__=='__main__':

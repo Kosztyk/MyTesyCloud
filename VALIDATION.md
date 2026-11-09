@@ -1,5 +1,27 @@
 # Validation notes
 
+## v1.2.13 water-heater and HTTP error safeguards
+
+B15, E32 and HPWH4_11 water-heater families have no physical model/firmware
+confirmation. Their entities retain read-only observations with no supported
+control features or write methods. The shared API rejects water-heater commands
+before MQTT or app-log requests, and editable calendars/schedule links are not
+created for these families. Controls may be enabled separately for a family
+after a contributor validates its command payloads and resulting appliance
+state on real hardware and supplies the model and firmware details.
+
+Offline tests exercise HTTP 429/500/502/503 responses, transport failures,
+timeouts and invalid JSON using credential-bearing exception URLs. They check
+both error messages and formatted tracebacks for credential disclosure across
+device, statistics, group and login requests. They also cover authentication
+rejection, successful responses, app-log debug logging, water-heater discovery
+and state reporting, blocked writes, and continued convector MQTT publishing.
+No test contacts MyTESY or sends commands to a physical appliance.
+
+The test suite requires `aiohttp` (also supplied by Home Assistant at runtime).
+For a standalone checkout, install it with `python3 -m pip install aiohttp`
+before running the commands below.
+
 ## Real-hardware validation
 
 On 2026-10-25, the maintainer confirmed successful testing of the integration's

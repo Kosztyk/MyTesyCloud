@@ -21,6 +21,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import TesyCloudCoordinator
+from .device_families import supports_water_heater
 
 
 def _safe_float(v: Any) -> float | None:
@@ -275,7 +276,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         entities.append(TesyCloudDeviceProfileSensor(coordinator, mac))
         entities.append(TesyCloudProgramSnapshotSensor(coordinator, mac))
         from .schedule_sensor import TesyScheduleEditor
-        entities.append(TesyScheduleEditor(coordinator, mac))
+        if not supports_water_heater(_device(coordinator, mac)):
+            entities.append(TesyScheduleEditor(coordinator, mac))
 
     from .statistics_sensor import TesyNativeStatSensor
     stats = hass.data[DOMAIN][entry.entry_id].get("statistics")

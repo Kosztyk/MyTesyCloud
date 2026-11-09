@@ -12,6 +12,7 @@ from typing import Any
 import aiohttp
 import paho.mqtt.client as mqtt
 
+from .device_families import supports_water_heater
 from .const import (
     TESY_API_BASE,
     TESY_LANG,
@@ -140,10 +141,12 @@ class TesyCloudApi:
                 data = await response.json(content_type=None)
         except TesyCloudAuthError:
             raise
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            raise TesyCloudError("Cannot reach MyTESY authentication service") from err
-        except ValueError as err:
-            raise TesyCloudError("Invalid MyTESY authentication response") from err
+        except aiohttp.ClientResponseError as err:
+            raise TesyCloudError(f"MyTESY answered HTTP {err.status}") from None
+        except (aiohttp.ClientError, asyncio.TimeoutError):
+            raise TesyCloudError("Cannot reach MyTESY authentication service") from None
+        except ValueError:
+            raise TesyCloudError("Invalid MyTESY authentication response") from None
         if not isinstance(data, dict) or data.get("errors") or not data.get("userID"):
             raise TesyCloudAuthError("MyTESY did not return a user ID; verify email and password")
         self._user_id = str(data["userID"])
@@ -169,14 +172,16 @@ class TesyCloudApi:
                 if resp.status in (401, 403):
                     raise TesyCloudAuthError("MyTESY rejected credentials")
                 resp.raise_for_status()
-                text = await resp.text()
-                try:
-                    data = await resp.json(content_type=None)
-                except Exception as e:  # noqa: BLE001
-                    raise TesyCloudError(f"JSON parse failed: {e}; body[:200]={text[:200]!r}") from e
+                data = await resp.json(content_type=None)
 
-        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
-            raise TesyCloudError(f"Connection error: {e}") from e
+        # These requests carry userPass in the URL. Never include the original
+        # exception or response body, including through a chained traceback.
+        except aiohttp.ClientResponseError as err:
+            raise TesyCloudError(f"MyTESY answered HTTP {err.status}") from None
+        except (aiohttp.ClientError, asyncio.TimeoutError):
+            raise TesyCloudError("Cannot reach MyTESY devices service") from None
+        except ValueError:
+            raise TesyCloudError("Invalid MyTESY devices response") from None
 
         if isinstance(data, dict) and str(data.get("error", "")) == "1":
             raise TesyCloudAuthError("MyTESY rejected credentials (error=1).")
@@ -203,8 +208,10 @@ class TesyCloudApi:
                                          timeout=aiohttp.ClientTimeout(total=20)) as response:
                 response.raise_for_status()
                 result = await response.json(content_type=None)
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
-            raise TesyCloudError(f"Statistics request failed ({kind}): {type(exc).__name__}") from exc
+        except aiohttp.ClientResponseError as err:
+            raise TesyCloudError(f"MyTESY answered HTTP {err.status}") from None
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
+            raise TesyCloudError(f"Statistics request failed ({kind})") from None
         if isinstance(result, dict) and str(result.get("error", "0")) == "1":
             raise TesyCloudError("TESY statistics endpoint returned an error")
         return result.get("data", result) if isinstance(result, dict) else result
@@ -229,8 +236,10 @@ class TesyCloudApi:
                                               timeout=aiohttp.ClientTimeout(total=20)) as response:
                     response.raise_for_status()
                     result = await response.json(content_type=None)
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
-            raise TesyCloudError(f"Group request failed ({endpoint}): {type(exc).__name__}") from exc
+        except aiohttp.ClientResponseError as err:
+            raise TesyCloudError(f"MyTESY answered HTTP {err.status}") from None
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
+            raise TesyCloudError(f"Group request failed ({endpoint})") from None
         if isinstance(result, dict) and (str(result.get("error", "0")) == "1" or result.get("success") is False):
             raise TesyCloudError(f"TESY group operation rejected: {endpoint}")
         return result
@@ -242,6 +251,10 @@ class TesyCloudApi:
         payload: dict[str, Any],
         request_type: str = "request",
     ) -> None:
+        if supports_water_heater(device):
+            raise TesyCloudError(
+                "MyTESY water heaters are read-only until commands are validated on physical hardware"
+            )
         mac = str(device.get("mac") or (device.get("state") or {}).get("mac") or "").strip()
         model = str(device.get("model") or "").strip()
         token = str(device.get("token") or "").strip()
@@ -286,7 +299,7 @@ class TesyCloudApi:
             async with self._session.post(url, json=body, headers=headers, timeout=aiohttp.ClientTimeout(total=15)):
                 return
         except Exception as err:  # noqa: BLE001
-            _LOGGER.debug("Tesy app-log POST failed for %s/%s: %s", mac, command, err)
+            _LOGGER.debug("Tesy app-log POST failed for %s/%s: %s", mac, command, type(err).__name__)
 
     async def async_set_power(self, device: dict[str, Any], on: bool) -> None:
         await self.async_send_command(device, "onOff", {"status": "on" if on else "off"})

@@ -1,3 +1,10 @@
+## 1.2.13 — Read-only water heaters and credential-safe errors
+
+- Keep B15, E32 and HPWH4_11 water-heater entities read-only: remove supported control features and all entity write methods. Block water-heater commands in the shared API, including schedule-service calls, and omit editable calendars/schedule links for those devices.
+- Announce the monitoring-only scope and invite model/firmware-specific hardware validation before enabling control for any water-heater family.
+- Report HTTP errors using only their status. Suppress credential-bearing exception chains for device, statistics, group and authentication requests; never echo response bodies or raw app-log request errors.
+- Add regression coverage for failure tracebacks, reauthentication, water-heater observations and blocked commands while preserving confirmed convector controls.
+
 ## 1.2.11 — Unique `mytesy` domain and schedule corrections
 
 - Install exclusively in `custom_components/mytesy`; all integration services, scheduler frontend URLs, entity registration and tests use domain `mytesy`.

@@ -8,6 +8,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 from homeassistant.exceptions import HomeAssistantError
 from .const import DOMAIN
+from .device_families import supports_water_heater
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -33,7 +34,9 @@ def _as_weekday(day):
 
 async def async_setup_entry(hass, entry, async_add_entities):
     coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
-    async_add_entities(TesyWeeklyCalendar(coordinator, mac) for mac in (coordinator.data or {}))
+    async_add_entities(TesyWeeklyCalendar(coordinator, mac)
+                       for mac, row in (coordinator.data or {}).items()
+                       if not supports_water_heater(row.get("device") or {}))
 
 
 class TesyWeeklyCalendar(CoordinatorEntity, CalendarEntity):

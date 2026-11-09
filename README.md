@@ -1,4 +1,4 @@
-## v1.2.12 — HACS review fixes, schedules, cloud features and unique `mytesy` domain
+## v1.2.13 — Read-only water heaters and credential-safe HTTP errors
 
 A dedicated switch on every convector device controls only whether **TESY schedules** is shown in Home Assistant’s left navigation. It does not modify the heater weekly program. Sidebar visibility is saved and survives Home Assistant restarts. The mistaken schedule on/off switch inside the editor has been removed. Existing entities and energy sensor unique IDs are unchanged.
 
@@ -11,7 +11,12 @@ A dedicated switch on every convector device controls only whether **TESY schedu
 > [!IMPORTANT]
 > **Existing manual installations must remove and re-add MyTESY Cloud.** The Home Assistant integration domain changed from `tesy` to `mytesy`. Back up Home Assistant, install under `/config/custom_components/mytesy/`, then remove the old cloud integration entry and add **MyTESY Cloud** again. Entity IDs, energy statistics and automations may require manual updates. See the [migration steps](#installation).
 
-Unofficial Home Assistant custom integration for TESY MyTESY cloud appliances, primarily **convectors**, using the MyTESY **v4** cloud endpoint. Additional water-heater and heat-pump support is model-dependent and requires real-device validation.
+Unofficial Home Assistant custom integration for TESY MyTESY cloud appliances, primarily **convectors**, using the MyTESY **v4** cloud endpoint. B15/E32 water heaters and HPWH4_11 heat pump water heaters are supported for read-only monitoring where the cloud provides their state.
+
+> [!NOTE]
+> **Water heaters are read-only in v1.2.13.** No B15, E32 or HPWH4_11 model/firmware has been physically tested. These entities keep reporting available temperatures, operating state and diagnostics, but expose no supported control features. Power, temperature, mode and schedule writes are disabled for these families, including direct integration service calls. Use the MyTESY app to control them.
+>
+> **Help enable controls:** If you own one of these appliances, [open an issue](https://github.com/Kosztyk/MyTesyCloud/issues) with its family, exact model and firmware version. Control commands can be enabled for each family as soon as a contributor tests and validates the command payloads and resulting appliance state on a real unit of that family. CN06AS convector testing does not validate water-heater commands.
 
 This integration uses **cloud polling** for status and MQTT-over-WebSocket for power, temperature and preset commands. Sensors and binary sensors are read-only.
 
@@ -33,7 +38,7 @@ The maintainer confirms that all available **convector** write operations and we
 | Comfort, Eco and correction settings | `setComfortTemp`, `setEcoTemp`, `setTCorrection` | Maintainer-reported CN06AS test |
 | Weekly schedule add, modify, delete | `setProgram`, `deleteProgram` | Maintainer-reported CN06AS test |
 
-All existing device controls remain enabled. The hardware details above are the maintainer's confirmation; automated tests additionally cover API/flow structure and service handling, not physical devices. 
+The confirmed convector controls remain enabled. The hardware details above are the maintainer's confirmation; automated tests additionally cover HTTP error privacy, read-only water-heater behavior, API/flow structure and service handling, not physical devices.
 
 See [VALIDATION.md](VALIDATION.md) for the scope of hardware tests and the regression suite.
 
@@ -191,11 +196,11 @@ HACS, Hassfest and packaging checks are run by GitHub Actions. These do not test
 [MIT License](LICENSE.txt); [original Romanian translation](docs/licenta-originala-ro.md).
 
 
-## Scheduler, settings and appliance support in v1.2.12
+## Scheduler, settings and appliance support in v1.2.13
 
 - A **TESY schedules** custom panel is available at `/mytesy-schedules`, accessible using a Schedule editor sensor or the administrator sidebar. Its visibility is controlled by the **Show TESY schedules in sidebar** switch on a TESY convector; this affects navigation only, never heater programming.
 - Weekly Program is a separate device setting. When TESY returns `programStatus: null`, the switch is **Unavailable** and the schedule panel reports **Status unavailable**. The panel does not treat missing program data as an empty schedule and disables editing until program data is reported.
-- Cloud statistics, device profile/program diagnostics, convector settings, calendar, group-management services, and model-dependent water-heater and heat-pump entities are included in the source. Controls for appliance families and schedule interval writes are **not validated on all physical devices**. Consult the release notes and verify model-specific behavior before operating physical equipment.
+- Cloud statistics, device profile/program diagnostics, convector settings, calendar and group-management services are included. Editable calendars and the schedule editor are available for convectors. B15/E32 water heaters and HPWH4_11 heat pump entities are read-only pending family-specific physical validation; their commands are blocked before MQTT publishing.
 - Service calls for schedule editing and group management now use the **`mytesy`** domain. There is no migration path that silently renames existing Home Assistant scripts or automations referring to old `tesy` services; update those manually.
 
 ## Estimated energy compatibility and domain migration

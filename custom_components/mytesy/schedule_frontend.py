@@ -6,9 +6,9 @@ from homeassistant.helpers.storage import Store
 from .const import DOMAIN
 
 PANEL_PATH = "mytesy-schedules"
-PANEL_NAME = "mytesy-schedule-panel-1-2-12"
-EDITOR_ASSET = "/mytesy/schedule-editor-1.2.12.js"
-ENTITY_ASSET = "/mytesy/schedule-entity-1.2.12.js"
+PANEL_NAME = "mytesy-schedule-panel-1-2-13"
+EDITOR_ASSET = "/mytesy/schedule-editor-1.2.13.js"
+ENTITY_ASSET = "/mytesy/schedule-entity-1.2.13.js"
 
 async def async_sidebar_state(hass):
     state = hass.data.setdefault(DOMAIN, {}).setdefault("_editor", {})

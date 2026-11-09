@@ -146,11 +146,10 @@ class AuthFlow(unittest.IsolatedAsyncioTestCase):
 
 
 class HardwareAndEnergy(unittest.TestCase):
-    def test_all_existing_write_features_remain_available(self):
+    def test_confirmed_convector_write_features_remain_available(self):
         switches = (COMP/'switch.py').read_text()
         numbers = (COMP/'number.py').read_text()
         calendar = (COMP/'calendar.py').read_text()
-        water_heater = (COMP/'water_heater.py').read_text()
         setup = (COMP/'__init__.py').read_text()
         for cmd in ('setAdaptiveStart', 'setAntiFrost', 'setOpenedWindow', 'setLockDevice', 'setUV', 'setProgramStatus'):
             self.assertIn(cmd, switches)
@@ -159,8 +158,6 @@ class HardwareAndEnergy(unittest.TestCase):
         for cmd in ('setProgram', 'deleteProgram'):
             self.assertIn(cmd, calendar)
             self.assertIn(cmd, setup)
-        for cmd in ('powerOnOff', 'setStandby', 'setMode'):
-            self.assertIn(cmd, water_heater)
 
     def test_energy_compatibility_is_unchanged(self):
         sensor = (COMP/'sensor.py').read_text()
